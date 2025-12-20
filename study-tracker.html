@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Tracker - Pomodoro Timer</title>
+    <link rel="stylesheet" href="assets/css/study-tracker.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Navigation -->
+        <nav class="nav-bar">
+            <h1 class="app-title">📚 Study Tracker</h1>
+            <div class="nav-buttons">
+                <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+                <button class="nav-btn" data-view="timer">Pomodoro Timer</button>
+                <button class="nav-btn" data-view="planner">📅 Planner</button>
+                <button class="nav-btn" data-view="account">
+                    <span id="account-icon">👤</span> Account
+                </button>
+            </div>
+        </nav>
+
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="view active">
+            <div class="dashboard-container">
+                <!-- Dashboard Category Tabs -->
+                <div class="dashboard-tabs">
+                    <button class="dashboard-tab active" data-category="igcse">📚 IGCSE Prep</button>
+                    <button class="dashboard-tab" data-category="general">🌟 General Learning</button>
+                </div>
+
+                <!-- Summary Section -->
+                <div class="summary-section">
+                    <div class="summary-card">
+                        <h3>This Week</h3>
+                        <p class="summary-value" id="weekly-total">0h 0m</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3>This Month</h3>
+                        <p class="summary-value" id="monthly-total">0h 0m</p>
+                    </div>
+                    <div class="summary-card">
+                        <h3>Total Sessions</h3>
+                        <p class="summary-value" id="total-sessions">0</p>
+                    </div>
+                </div>
+
+                <!-- Filters Section -->
+                <div class="filters-section">
+                    <div class="filter-group">
+                        <label for="subject-filter">Filter by Subject:</label>
+                        <select id="subject-filter" class="filter-select">
+                            <option value="">All Subjects</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="date-range-filter">Filter by Period:</label>
+                        <select id="date-range-filter" class="filter-select">
+                            <option value="all">All Time</option>
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                        </select>
+                    </div>
+                    <button class="btn-clear" id="clear-filters">Clear Filters</button>
+                </div>
+
+                <!-- Manual Log Section -->
+                <div class="manual-log-section">
+                    <h2>Log Manual Session</h2>
+                    <p class="manual-log-description">Forgot to start the timer? Log your study session manually.</p>
+                    <form id="manual-log-form" class="manual-log-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="manual-subject">Subject:</label>
+                                <select id="manual-subject" class="form-input" required>
+                                    <option value="">Choose a subject...</option>
+                                    <option value="Math">Math</option>
+                                    <option value="English">English</option>
+                                    <option value="Physics">Physics</option>
+                                    <option value="Psychology">Psychology</option>
+                                    <option value="Business">Business</option>
+                                    <option value="Geography">Geography</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                <input type="text" id="manual-custom-subject" class="form-input custom-subject-input" placeholder="Enter custom subject..." style="display: none;">
+                            </div>
+                            <div class="form-group">
+                                <label for="manual-duration">Duration (minutes):</label>
+                                <input type="number" id="manual-duration" class="form-input" value="45" min="1" max="600" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="manual-date">Date:</label>
+                                <input type="date" id="manual-date" class="form-input" required>
+                            </div>
+                            <div class="form-group form-group-button">
+                                <button type="submit" class="btn-log">Log Session</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- View Mode Switcher -->
+                <div class="view-mode-section">
+                    <h2>Study Sessions</h2>
+                    <div class="view-mode-buttons">
+                        <button class="view-mode-btn active" data-view="table" title="Table View">
+                            <span>📊</span> Table
+                        </button>
+                        <button class="view-mode-btn" data-view="cards" title="Card View">
+                            <span>🃏</span> Cards
+                        </button>
+                        <button class="view-mode-btn" data-view="bars" title="Bar Chart">
+                            <span>📈</span> Bars
+                        </button>
+                        <button class="view-mode-btn" data-view="pie" title="Pie Chart">
+                            <span>🥧</span> Pie
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table View -->
+                <div id="table-view" class="view-mode active">
+                    <div class="sessions-section">
+                        <div class="table-container">
+                            <table class="sessions-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Subject</th>
+                                        <th>Duration</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sessions-table-body">
+                                    <tr class="empty-row">
+                                        <td colspan="4">No study sessions yet. Start a Pomodoro timer to log your first session!</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cards View -->
+                <div id="cards-view" class="view-mode">
+                    <div class="sessions-cards-container" id="sessions-cards-body">
+                        <div class="empty-state">No study sessions yet. Start a Pomodoro timer to log your first session!</div>
+                    </div>
+                </div>
+
+                <!-- Bar Chart View -->
+                <div id="bars-view" class="view-mode">
+                    <div class="chart-container">
+                        <canvas id="bar-chart"></canvas>
+                        <div class="chart-empty" id="bar-chart-empty">No data to display</div>
+                    </div>
+                </div>
+
+                <!-- Pie Chart View -->
+                <div id="pie-view" class="view-mode">
+                    <div class="chart-container">
+                        <canvas id="pie-chart"></canvas>
+                        <div class="chart-empty" id="pie-chart-empty">No data to display</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pomodoro Timer View -->
+        <div id="timer-view" class="view">
+            <div class="timer-container">
+                <!-- Timer Category Tabs -->
+                <div class="timer-tabs">
+                    <button class="timer-tab active" data-timer-category="igcse">📚 IGCSE Prep Timer</button>
+                    <button class="timer-tab" data-timer-category="general">🌟 General Learning Timer</button>
+                </div>
+
+                <!-- IGCSE Prep Timer -->
+                <div id="igcse-timer" class="timer-card-wrapper active">
+                    <div class="timer-card">
+                        <h2>📚 IGCSE Prep Timer</h2>
+                        
+                        <!-- Subject Selection -->
+                        <div class="subject-selection">
+                            <label for="igcse-subject-select">Select Subject:</label>
+                            <div class="subject-input-group">
+                                <select id="igcse-subject-select" class="subject-select">
+                                    <option value="">Choose a subject...</option>
+                                </select>
+                                <input type="text" id="igcse-custom-subject" class="custom-subject-input" placeholder="Or enter custom subject..." style="display: none;">
+                            </div>
+                        </div>
+
+                        <!-- Timer Display -->
+                        <div class="timer-display">
+                            <div class="timer-circle">
+                                <svg class="timer-svg" viewBox="0 0 200 200">
+                                    <circle class="timer-bg" cx="100" cy="100" r="90"></circle>
+                                    <circle class="timer-progress timer-progress-igcse" cx="100" cy="100" r="90"></circle>
+                                </svg>
+                                <div class="timer-text">
+                                    <span class="timer-display-igcse">45:00</span>
+                                    <span class="timer-label" id="igcse-timer-label">Ready to start</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Timer Controls -->
+                        <div class="timer-controls">
+                            <button class="btn-timer" id="igcse-start-btn">Start</button>
+                            <button class="btn-timer" id="igcse-pause-btn" disabled>Pause</button>
+                            <button class="btn-timer" id="igcse-reset-btn">Reset</button>
+                        </div>
+
+                        <!-- Timer Settings -->
+                        <div class="timer-settings">
+                            <label for="igcse-timer-duration">Session Duration (minutes):</label>
+                            <select id="igcse-timer-duration" class="timer-select">
+                                <option value="15">15 minutes</option>
+                                <option value="25">25 minutes (Pomodoro)</option>
+                                <option value="30">30 minutes</option>
+                                <option value="45" selected>45 minutes</option>
+                                <option value="60">60 minutes</option>
+                            </select>
+                        </div>
+
+                        <!-- Break Timer -->
+                        <div class="break-section">
+                            <h3>Break Timer</h3>
+                            <div class="break-timer-display">
+                                <span class="break-display-igcse">05:00</span>
+                            </div>
+                            <div class="break-controls">
+                                <button class="btn-break" id="igcse-start-break-btn" disabled>Start Break</button>
+                                <button class="btn-break" id="igcse-skip-break-btn" disabled>Skip Break</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- General Learning Timer -->
+                <div id="general-timer" class="timer-card-wrapper">
+                    <div class="timer-card">
+                        <h2>🌟 General Learning Timer</h2>
+                        
+                        <!-- Subject Selection -->
+                        <div class="subject-selection">
+                            <label for="general-subject-select">Select Subject:</label>
+                            <div class="subject-input-group">
+                                <select id="general-subject-select" class="subject-select">
+                                    <option value="">Choose a subject...</option>
+                                </select>
+                                <input type="text" id="general-custom-subject" class="custom-subject-input" placeholder="Or enter custom subject..." style="display: none;">
+                            </div>
+                        </div>
+
+                        <!-- Timer Display -->
+                        <div class="timer-display">
+                            <div class="timer-circle">
+                                <svg class="timer-svg" viewBox="0 0 200 200">
+                                    <circle class="timer-bg" cx="100" cy="100" r="90"></circle>
+                                    <circle class="timer-progress timer-progress-general" cx="100" cy="100" r="90"></circle>
+                                </svg>
+                                <div class="timer-text">
+                                    <span class="timer-display-general">45:00</span>
+                                    <span class="timer-label" id="general-timer-label">Ready to start</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Timer Controls -->
+                        <div class="timer-controls">
+                            <button class="btn-timer" id="general-start-btn">Start</button>
+                            <button class="btn-timer" id="general-pause-btn" disabled>Pause</button>
+                            <button class="btn-timer" id="general-reset-btn">Reset</button>
+                        </div>
+
+                        <!-- Timer Settings -->
+                        <div class="timer-settings">
+                            <label for="general-timer-duration">Session Duration (minutes):</label>
+                            <select id="general-timer-duration" class="timer-select">
+                                <option value="15">15 minutes</option>
+                                <option value="25">25 minutes (Pomodoro)</option>
+                                <option value="30">30 minutes</option>
+                                <option value="45" selected>45 minutes</option>
+                                <option value="60">60 minutes</option>
+                            </select>
+                        </div>
+
+                        <!-- Break Timer -->
+                        <div class="break-section">
+                            <h3>Break Timer</h3>
+                            <div class="break-timer-display">
+                                <span class="break-display-general">05:00</span>
+                            </div>
+                            <div class="break-controls">
+                                <button class="btn-break" id="general-start-break-btn" disabled>Start Break</button>
+                                <button class="btn-break" id="general-skip-break-btn" disabled>Skip Break</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Planner View -->
+        <div id="planner-view" class="view">
+            <div class="planner-container">
+                <div class="planner-header">
+                    <h2>📅 Weekly Study Planner</h2>
+                    <div class="planner-controls">
+                        <button class="btn-add-task" id="add-task-btn">+ Add Task</button>
+                        <button class="btn-clear-week" id="clear-week-btn">Clear Week</button>
+                    </div>
+                </div>
+
+                <!-- Week Navigation -->
+                <div class="week-navigation">
+                    <button class="btn-week-nav" id="prev-week-btn">← Previous Week</button>
+                    <h3 id="current-week-display">Week of [Date]</h3>
+                    <button class="btn-week-nav" id="next-week-btn">Next Week →</button>
+                </div>
+
+                <!-- Weekly Planner Grid -->
+                <div class="planner-grid">
+                    <div class="planner-day" data-day="monday">
+                        <div class="day-header">
+                            <h4>Monday</h4>
+                            <span class="day-date" id="monday-date"></span>
+                        </div>
+                        <div class="day-tasks" id="monday-tasks" data-day="monday">
+                            <div class="empty-day-message">No tasks planned</div>
+                        </div>
+                    </div>
+                    <div class="planner-day" data-day="tuesday">
+                        <div class="day-header">
+                            <h4>Tuesday</h4>
+                            <span class="day-date" id="tuesday-date"></span>
+                        </div>
+                        <div class="day-tasks" id="tuesday-tasks" data-day="tuesday">
+                            <div class="empty-day-message">No tasks planned</div>
+                        </div>
+                    </div>
+                    <div class="planner-day" data-day="wednesday">
+                        <div class="day-header">
+                            <h4>Wednesday</h4>
+                            <span class="day-date" id="wednesday-date"></span>
+                        </div>
+                        <div class="day-tasks" id="wednesday-tasks" data-day="wednesday">
+                            <div class="empty-day-message">No tasks planned</div>
+                        </div>
+                    </div>
+                    <div class="planner-day" data-day="thursday">
+                        <div class="day-header">
+                            <h4>Thursday</h4>
+                            <span class="day-date" id="thursday-date"></span>
+                        </div>
+                        <div class="day-tasks" id="thursday-tasks" data-day="thursday">
+                            <div class="empty-day-message">No tasks planned</div>
+                        </div>
+                    </div>
+                    <div class="planner-day" data-day="friday">
+                        <div class="day-header">
+                            <h4>Friday</h4>
+                            <span class="day-date" id="friday-date"></span>
+                        </div>
+                        <div class="day-tasks" id="friday-tasks" data-day="friday">
+                            <div class="empty-day-message">No tasks planned</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Task Modal -->
+        <div id="task-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Add Study Task</h3>
+                    <button class="modal-close" id="close-modal-btn">&times;</button>
+                </div>
+                <form id="task-form" class="task-form">
+                    <div class="form-group">
+                        <label for="task-category">Category:</label>
+                        <select id="task-category" class="form-input" required>
+                            <option value="igcse">IGCSE Prep</option>
+                            <option value="general">General Learning</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-subject">Subject:</label>
+                        <select id="task-subject" class="form-input" required>
+                            <option value="">Choose a subject...</option>
+                        </select>
+                        <input type="text" id="task-custom-subject" class="form-input" placeholder="Or enter custom subject..." style="display: none;">
+                    </div>
+                    <div class="form-group">
+                        <label for="task-duration">Duration (minutes):</label>
+                        <input type="number" id="task-duration" class="form-input" value="45" min="1" max="600" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-day">Day:</label>
+                        <select id="task-day" class="form-input" required>
+                            <option value="monday">Monday</option>
+                            <option value="tuesday">Tuesday</option>
+                            <option value="wednesday">Wednesday</option>
+                            <option value="thursday">Thursday</option>
+                            <option value="friday">Friday</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-cancel" id="cancel-task-btn">Cancel</button>
+                        <button type="submit" class="btn-save-task">Add Task</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Account View -->
+        <div id="account-view" class="view">
+            <div class="account-container">
+                <!-- Login/Signup Section -->
+                <div id="auth-section" class="account-section">
+                    <h2>Account</h2>
+                    <div class="auth-tabs">
+                        <button class="auth-tab active" data-auth="login">Login</button>
+                        <button class="auth-tab" data-auth="signup">Sign Up</button>
+                    </div>
+
+                    <!-- Login Form -->
+                    <form id="login-form" class="auth-form active">
+                        <div class="form-group">
+                            <label for="login-email">Email:</label>
+                            <input type="email" id="login-email" class="form-input" required placeholder="your@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Password:</label>
+                            <input type="password" id="login-password" class="form-input" required placeholder="••••••••">
+                        </div>
+                        <button type="submit" class="btn-primary-auth">Login</button>
+                        <p class="auth-note">Local storage mode - data saved in your browser</p>
+                    </form>
+
+                    <!-- Signup Form -->
+                    <form id="signup-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="signup-name">Name:</label>
+                            <input type="text" id="signup-name" class="form-input" required placeholder="Your Name">
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-email">Email:</label>
+                            <input type="email" id="signup-email" class="form-input" required placeholder="your@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-password">Password:</label>
+                            <input type="password" id="signup-password" class="form-input" required placeholder="••••••••" minlength="6">
+                        </div>
+                        <button type="submit" class="btn-primary-auth">Create Account</button>
+                    </form>
+                </div>
+
+                <!-- User Dashboard (shown when logged in) -->
+                <div id="user-dashboard" class="account-section" style="display: none;">
+                    <div class="user-header">
+                        <h2>Welcome, <span id="user-name">User</span>!</h2>
+                        <button class="btn-logout" id="logout-btn">Logout</button>
+                    </div>
+
+                    <!-- Notion Integration Section -->
+                    <div class="integration-section">
+                        <h3>🔗 Notion Integration</h3>
+                        <p class="integration-description">
+                            Connect your Notion workspace to sync study sessions with your Ultimate Brain template.
+                            Sessions will automatically appear in your Notion database.
+                        </p>
+
+                        <div id="notion-disconnected" class="notion-status">
+                            <div class="status-content">
+                                <p><strong>Not Connected</strong></p>
+                                <p class="status-detail">Connect your Notion workspace to enable syncing</p>
+                            </div>
+                            <button class="btn-connect-notion" id="connect-notion-btn">Connect Notion</button>
+                        </div>
+
+                        <div id="notion-connected" class="notion-status" style="display: none;">
+                            <div class="status-content">
+                                <p><strong>✅ Connected</strong></p>
+                                <p class="status-detail" id="notion-workspace-name">Workspace: Your Workspace</p>
+                                <p class="status-detail" id="notion-database-name">Database: Study Sessions</p>
+                            </div>
+                            <div class="notion-actions">
+                                <button class="btn-sync" id="sync-now-btn">Sync Now</button>
+                                <button class="btn-disconnect" id="disconnect-notion-btn">Disconnect</button>
+                            </div>
+                        </div>
+
+                        <!-- Notion Setup Instructions -->
+                        <div class="notion-setup">
+                            <h4>How to Set Up Notion Integration:</h4>
+                            <ol class="setup-steps">
+                                <li>Create a Notion integration at <a href="https://www.notion.so/my-integrations" target="_blank">notion.so/my-integrations</a></li>
+                                <li>Copy your Integration Token (starts with "secret_")</li>
+                                <li>Create a database in your Ultimate Brain workspace with these properties:
+                                    <ul>
+                                        <li><strong>Date</strong> (Date property)</li>
+                                        <li><strong>Subject</strong> (Title or Text property)</li>
+                                        <li><strong>Duration</strong> (Number property, in minutes)</li>
+                                        <li><strong>Category</strong> (Select: IGCSE Prep / General Learning)</li>
+                                    </ul>
+                                </li>
+                                <li>Share the database with your integration (click "..." → "Add connections")</li>
+                                <li>Paste your Integration Token and Database ID below</li>
+                            </ol>
+
+                            <div class="notion-config">
+                                <div class="form-group">
+                                    <label for="notion-token">Notion Integration Token:</label>
+                                    <input type="password" id="notion-token" class="form-input" placeholder="secret_...">
+                                    <small>Keep this secure! Never share your token.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="notion-database-id">Database ID:</label>
+                                    <input type="text" id="notion-database-id" class="form-input" placeholder="32-character ID from database URL">
+                                    <small>Found in your database URL: notion.so/workspace/<strong>DATABASE_ID</strong></small>
+                                </div>
+                                <button class="btn-save-config" id="save-notion-config">Save Configuration</button>
+                            </div>
+                        </div>
+
+                        <!-- Sync Status -->
+                        <div id="sync-status" class="sync-status" style="display: none;">
+                            <p id="sync-message"></p>
+                        </div>
+                    </div>
+
+                    <!-- Account Settings -->
+                    <div class="settings-section">
+                        <h3>⚙️ Settings</h3>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" id="auto-sync" checked>
+                                    Auto-sync with Notion
+                                </label>
+                                <small>Automatically sync sessions when logged</small>
+                            </div>
+                            <div class="setting-item">
+                                <label>
+                                    <input type="checkbox" id="sync-on-timer-complete" checked>
+                                    Sync on timer completion
+                                </label>
+                                <small>Sync immediately when Pomodoro timer finishes</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/study-tracker.js"></script>
+    <script src="assets/js/notion-integration.js"></script>
+</body>
+</html>
+
