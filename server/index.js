@@ -4,6 +4,10 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import authRoutes from './routes/auth.js';
+import categoriesRoutes from './routes/categories.js';
+import plansRoutes from './routes/plans.js';
+import logsRoutes from './routes/logs.js';
+import analyticsRoutes from './routes/analytics.js';
 
 dotenv.config();
 
@@ -23,16 +27,20 @@ app.use(express.static(join(__dirname, '..')));
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/categories', categoriesRoutes);
+app.use('/api/plans', plansRoutes);
+app.use('/api/logs', logsRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Study Tracker API is running' });
+  res.json({ status: 'ok', message: 'Logbook API is running' });
 });
 
 // Serve the main HTML file for all non-API routes
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api')) {
-    res.sendFile(join(__dirname, '..', 'study-tracker.html'));
+    res.sendFile(join(__dirname, '..', 'index.html'));
   }
 });
 
@@ -44,12 +52,9 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`
-🚀 Study Tracker Server Running!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 Server: http://localhost:${PORT}
-🗄️  Database: SQLite (${process.env.DATABASE_PATH || './server/database/studytracker.db'})
-🔐 Auth: JWT-based authentication
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Logbook Server Running!
+  Server: http://localhost:${PORT}
+  Database: SQLite (${process.env.DATABASE_PATH || './server/database/studytracker.db'})
   `);
 });
 

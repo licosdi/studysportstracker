@@ -6,79 +6,130 @@ export const createTables = (db) => {
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      preferences TEXT DEFAULT '{}',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  // Study sessions table
+  // Study Categories (presets)
   db.exec(`
-    CREATE TABLE IF NOT EXISTS study_sessions (
+    CREATE TABLE IF NOT EXISTS study_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT DEFAULT '#6366f1',
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id, name)
+    )
+  `);
+
+  // Football Categories (presets)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS football_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT,
+      color TEXT DEFAULT '#10b981',
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id, name)
+    )
+  `);
+
+  // Plan Items (for both study and football)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS plan_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       date TEXT NOT NULL,
-      subject TEXT NOT NULL,
-      duration INTEGER NOT NULL,
-      category TEXT NOT NULL CHECK(category IN ('igcse', 'general')),
-      planner_task_id INTEGER,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (planner_task_id) REFERENCES planner_tasks(id) ON DELETE SET NULL
-    )
-  `);
-
-  // Custom presets table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS custom_presets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      subject TEXT NOT NULL,
-      category TEXT NOT NULL CHECK(category IN ('igcse', 'general')),
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      UNIQUE(user_id, subject, category)
-    )
-  `);
-
-  // Planner tasks table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS planner_tasks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      subject TEXT NOT NULL,
-      duration INTEGER NOT NULL,
-      day TEXT NOT NULL CHECK(day IN ('monday', 'tuesday', 'wednesday', 'thursday', 'friday')),
-      category TEXT NOT NULL CHECK(category IN ('igcse', 'general')),
-      completed BOOLEAN NOT NULL DEFAULT 0,
-      week_start TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Notion configuration table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS notion_config (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER UNIQUE NOT NULL,
-      token TEXT NOT NULL,
-      database_id TEXT NOT NULL,
-      auto_sync BOOLEAN DEFAULT 1,
-      sync_on_timer_complete BOOLEAN DEFAULT 1,
+      area TEXT NOT NULL CHECK(area IN ('study', 'football')),
+      title TEXT NOT NULL,
+      notes TEXT,
+      category_id INTEGER NOT NULL,
+      duration_minutes INTEGER DEFAULT 45,
+      intensity TEXT CHECK(intensity IN ('low', 'medium', 'high')),
+      status TEXT DEFAULT 'planned' CHECK(status IN ('planned', 'completed', 'skipped')),
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
 
+  // Log Entries (actual completed work)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS log_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      area TEXT NOT NULL CHECK(area IN ('study', 'football')),
+      date_time TEXT NOT NULL,
+      category_id INTEGER NOT NULL,
+      plan_item_id INTEGER,
+      title TEXT NOT NULL,
+      notes TEXT,
+      duration_minutes INTEGER NOT NULL,
+      intensity TEXT CHECK(intensity IN ('low', 'medium', 'high')),
+      points INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (plan_item_id) REFERENCES plan_items(id) ON DELETE SET NULL
+    )
+  `);
+
   // Create indexes for better query performance
   db.exec(`
-    CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON study_sessions(user_id);
-    CREATE INDEX IF NOT EXISTS idx_sessions_date ON study_sessions(date);
-    CREATE INDEX IF NOT EXISTS idx_sessions_category ON study_sessions(category);
-    CREATE INDEX IF NOT EXISTS idx_planner_user_week ON planner_tasks(user_id, week_start);
-    CREATE INDEX IF NOT EXISTS idx_presets_user_category ON custom_presets(user_id, category);
+    CREATE INDEX IF NOT EXISTS idx_study_categories_user ON study_categories(user_id);
+    CREATE INDEX IF NOT EXISTS idx_football_categories_user ON football_categories(user_id);
+    CREATE INDEX IF NOT EXISTS idx_plan_items_user_date ON plan_items(user_id, date);
+    CREATE INDEX IF NOT EXISTS idx_plan_items_area ON plan_items(area);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_user_date ON log_entries(user_id, date_time);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_area ON log_entries(area);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_category ON log_entries(category_id);
   `);
 
   console.log('Database tables created successfully');
+};
+
+// Function to seed default categories for a new user
+export const seedDefaultCategories = (db, userId) => {
+  // Default study categories
+  const studyCategories = [
+    { name: 'Math', color: '#6366f1' },
+    { name: 'English', color: '#8b5cf6' },
+    { name: 'Physics', color: '#06b6d4' },
+    { name: 'Business', color: '#f59e0b' },
+    { name: 'Psychology', color: '#ec4899' },
+    { name: 'Geography', color: '#10b981' }
+  ];
+
+  // Default football categories
+  const footballCategories = [
+    { name: 'Team Training', type: 'team', color: '#22c55e' },
+    { name: 'Strength', type: 'strength', color: '#ef4444' },
+    { name: 'Endurance', type: 'endurance', color: '#f97316' },
+    { name: 'Ball Work', type: 'ball', color: '#3b82f6' },
+    { name: 'Recovery', type: 'recovery', color: '#a855f7' }
+  ];
+
+  const insertStudy = db.prepare(`
+    INSERT OR IGNORE INTO study_categories (user_id, name, color)
+    VALUES (?, ?, ?)
+  `);
+
+  const insertFootball = db.prepare(`
+    INSERT OR IGNORE INTO football_categories (user_id, name, type, color)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  for (const cat of studyCategories) {
+    insertStudy.run(userId, cat.name, cat.color);
+  }
+
+  for (const cat of footballCategories) {
+    insertFootball.run(userId, cat.name, cat.type, cat.color);
+  }
 };

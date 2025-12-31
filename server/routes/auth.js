@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../database/db.js';
 import { generateToken, authenticateToken } from '../middleware/auth.js';
+import { seedDefaultCategories } from '../database/schema.js';
 
 const router = express.Router();
 
@@ -39,6 +40,9 @@ router.post('/register', async (req, res) => {
       name,
       email
     };
+
+    // Seed default categories for the new user
+    seedDefaultCategories(db, user.id);
 
     // Generate JWT token
     const token = generateToken(user);
