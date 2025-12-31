@@ -1,7 +1,7 @@
-// Study Tracker Application
+// Study Tracker Application - Backend API Version
 class StudyTracker {
     constructor() {
-        this.sessions = this.loadSessions();
+        this.sessions = [];
         this.currentTimer = null;
         this.timerInterval = null;
         // Timer state for IGCSE
@@ -24,25 +24,29 @@ class StudyTracker {
         this.generalTimerDuration = 45;
         this.generalTimerInterval = null;
 
-        this.currentTimerCategory = 'igcse'; // Which timer is active
-        this.currentCategory = 'igcse'; // 'igcse' or 'general'
-        this.currentViewMode = 'table'; // 'table', 'cards', 'bars', 'pie'
+        this.currentTimerCategory = 'igcse';
+        this.currentCategory = 'igcse';
+        this.currentViewMode = 'table';
         this.igcseSubjects = ['Math', 'English', 'Physics', 'Psychology', 'Business', 'Geography'];
         this.currentUser = null;
         this.notionIntegration = null;
-        this.customIgcsePresets = this.loadCustomPresets('igcse');
-        this.customGeneralPresets = this.loadCustomPresets('general');
-        this.plannerTasks = this.loadPlannerTasks();
+        this.customIgcsePresets = [];
+        this.customGeneralPresets = [];
+        this.plannerTasks = [];
         this.currentWeekStart = this.getWeekStart(new Date());
-        
+
         this.init();
     }
 
-    init() {
+    async init() {
         this.setupEventListeners();
-        this.checkAuth();
-        this.updateManualSubjectDropdown(); // Initialize dropdown
-        this.updateTimerSubjectDropdowns(); // Initialize timer dropdowns
+        await this.checkAuth();
+    }
+
+    async initializeAfterAuth() {
+        await this.loadAllData();
+        this.updateManualSubjectDropdown();
+        this.updateTimerSubjectDropdowns();
         this.renderDashboard();
         this.updateSummary();
         this.populateSubjectFilter();
@@ -50,45 +54,42 @@ class StudyTracker {
         this.initializeTimerCircle('general');
         this.updateTimerDisplay('igcse');
         this.updateTimerDisplay('general');
-        
+
         // Initialize Notion integration after DOM is ready
         if (typeof NotionIntegration !== 'undefined') {
             this.notionIntegration = new NotionIntegration(this);
         }
     }
 
-    // Local Storage Management
-    loadSessions() {
-        const stored = localStorage.getItem('studySessions');
-        return stored ? JSON.parse(stored) : [];
-    }
+    async loadAllData() {
+        try {
+            // Load sessions
+            this.sessions = await api.getSessions();
 
-    saveSessions() {
-        localStorage.setItem('studySessions', JSON.stringify(this.sessions));
-    }
+            // Load presets
+            const allPresets = await api.getPresets();
+            this.customIgcsePresets = allPresets
+                .filter(p => p.category === 'igcse')
+                .map(p => p.subject);
+            this.customGeneralPresets = allPresets
+                .filter(p => p.category === 'general')
+                .map(p => p.subject);
 
-    loadCustomPresets(category) {
-        const stored = localStorage.getItem(`customPresets_${category}`);
-        return stored ? JSON.parse(stored) : [];
-    }
-
-    saveCustomPresets(category, presets) {
-        localStorage.setItem(`customPresets_${category}`, JSON.stringify(presets));
-    }
-
-    loadPlannerTasks() {
-        const stored = localStorage.getItem('plannerTasks');
-        return stored ? JSON.parse(stored) : [];
-    }
-
-    savePlannerTasks() {
-        localStorage.setItem('plannerTasks', JSON.stringify(this.plannerTasks));
+            // Load planner tasks
+            this.plannerTasks = await api.getPlannerTasks();
+        } catch (error) {
+            console.error('Error loading data:', error);
+            this.sessions = [];
+            this.customIgcsePresets = [];
+            this.customGeneralPresets = [];
+            this.plannerTasks = [];
+        }
     }
 
     getWeekStart(date) {
         const d = new Date(date);
         const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
         return new Date(d.setDate(diff));
     }
 
@@ -97,20 +98,23 @@ class StudyTracker {
         return date.toLocaleDateString('en-US', options);
     }
 
-    addCustomPreset(subject, category) {
-        if (category === 'igcse') {
-            if (!this.customIgcsePresets.includes(subject)) {
-                this.customIgcsePresets.push(subject);
-                this.saveCustomPresets('igcse', this.customIgcsePresets);
+    async addCustomPreset(subject, category) {
+        try {
+            await api.createPreset(subject, category);
+            if (category === 'igcse') {
+                if (!this.customIgcsePresets.includes(subject)) {
+                    this.customIgcsePresets.push(subject);
+                }
+            } else {
+                if (!this.customGeneralPresets.includes(subject)) {
+                    this.customGeneralPresets.push(subject);
+                }
             }
-        } else {
-            if (!this.customGeneralPresets.includes(subject)) {
-                this.customGeneralPresets.push(subject);
-                this.saveCustomPresets('general', this.customGeneralPresets);
-            }
+            this.updateManualSubjectDropdown();
+            this.updateTimerSubjectDropdowns();
+        } catch (error) {
+            console.error('Error adding preset:', error);
         }
-        this.updateManualSubjectDropdown();
-        this.updateTimerSubjectDropdowns();
     }
 
     // Navigation
@@ -196,11 +200,17 @@ class StudyTracker {
         });
     }
 
-    checkAuth() {
-        const user = localStorage.getItem('currentUser');
-        if (user) {
-            this.currentUser = JSON.parse(user);
-            this.showUserDashboard();
+    async checkAuth() {
+        if (api.isAuthenticated()) {
+            try {
+                this.currentUser = await api.getCurrentUser();
+                this.showUserDashboard();
+                await this.initializeAfterAuth();
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                await api.logout();
+                this.showAuthSection();
+            }
         } else {
             this.showAuthSection();
         }
@@ -215,24 +225,21 @@ class StudyTracker {
         });
     }
 
-    login() {
+    async login() {
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
 
-        // localStorage mode - simple validation
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const user = users.find(u => u.email === email);
-
-        if (user && user.password === password) {
-            this.currentUser = { name: user.name, email: user.email };
-            localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+        try {
+            const data = await api.login(email, password);
+            this.currentUser = data.user;
             this.showUserDashboard();
-        } else {
-            alert('Invalid credentials. Please sign up to create an account.');
+            await this.initializeAfterAuth();
+        } catch (error) {
+            alert(error.message || 'Login failed. Please check your credentials.');
         }
     }
 
-    signup() {
+    async signup() {
         const name = document.getElementById('signup-name').value;
         const email = document.getElementById('signup-email').value;
         const password = document.getElementById('signup-password').value;
@@ -242,24 +249,23 @@ class StudyTracker {
             return;
         }
 
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-
-        if (users.find(u => u.email === email)) {
-            alert('Email already registered. Please login instead.');
-            return;
+        try {
+            const data = await api.register(name, email, password);
+            this.currentUser = data.user;
+            this.showUserDashboard();
+            await this.initializeAfterAuth();
+        } catch (error) {
+            alert(error.message || 'Registration failed. Please try again.');
         }
-
-        users.push({ name, email, password });
-        localStorage.setItem('users', JSON.stringify(users));
-
-        this.currentUser = { name, email };
-        localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-        this.showUserDashboard();
     }
 
-    logout() {
+    async logout() {
+        await api.logout();
         this.currentUser = null;
-        localStorage.removeItem('currentUser');
+        this.sessions = [];
+        this.customIgcsePresets = [];
+        this.customGeneralPresets = [];
+        this.plannerTasks = [];
         this.showAuthSection();
         this.switchView('dashboard');
     }
@@ -309,7 +315,7 @@ class StudyTracker {
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
-        
+
         const manualDateInput = document.getElementById('manual-date');
         if (manualDateInput) {
             manualDateInput.value = `${year}-${month}-${day}`;
@@ -318,15 +324,15 @@ class StudyTracker {
 
     switchCategory(category) {
         this.currentCategory = category;
-        
+
         // Update tab buttons
         document.querySelectorAll('.dashboard-tab').forEach(tab => {
             tab.classList.toggle('active', tab.dataset.category === category);
         });
-        
+
         // Update manual log subject dropdown
         this.updateManualSubjectDropdown();
-        
+
         // Re-render dashboard
         this.renderDashboard();
         this.updateSummary();
@@ -379,17 +385,17 @@ class StudyTracker {
 
     switchViewMode(viewMode) {
         this.currentViewMode = viewMode;
-        
+
         // Update view mode buttons
         document.querySelectorAll('.view-mode-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.view === viewMode);
         });
-        
+
         // Show/hide view containers
         document.querySelectorAll('.view-mode').forEach(view => {
             view.classList.toggle('active', view.id === `${viewMode}-view`);
         });
-        
+
         // Re-render current view
         this.renderDashboard();
     }
@@ -397,25 +403,27 @@ class StudyTracker {
     getFilteredSessions() {
         const subjectFilter = document.getElementById('subject-filter').value;
         const dateRangeFilter = document.getElementById('date-range-filter').value;
-        
+
         // Filter by category - include custom presets
         let filteredSessions = this.sessions.filter(s => {
             if (this.currentCategory === 'igcse') {
                 // IGCSE: include default IGCSE subjects + custom IGCSE presets
-                return this.igcseSubjects.includes(s.subject) || 
-                       this.customIgcsePresets.includes(s.subject);
+                return this.igcseSubjects.includes(s.subject) ||
+                       this.customIgcsePresets.includes(s.subject) ||
+                       s.category === 'igcse';
             } else {
                 // General: exclude IGCSE subjects and custom IGCSE presets
-                return !this.igcseSubjects.includes(s.subject) && 
-                       !this.customIgcsePresets.includes(s.subject);
+                return (!this.igcseSubjects.includes(s.subject) &&
+                       !this.customIgcsePresets.includes(s.subject)) ||
+                       s.category === 'general';
             }
         });
-        
+
         // Filter by subject
         if (subjectFilter) {
             filteredSessions = filteredSessions.filter(s => s.subject === subjectFilter);
         }
-        
+
         // Filter by date range
         if (dateRangeFilter !== 'all') {
             const now = new Date();
@@ -431,11 +439,11 @@ class StudyTracker {
                 return true;
             });
         }
-        
+
         return filteredSessions;
     }
 
-    logManualSession() {
+    async logManualSession() {
         const subjectSelect = document.getElementById('manual-subject');
         const customSubject = document.getElementById('manual-custom-subject');
         const duration = parseInt(document.getElementById('manual-duration').value);
@@ -443,7 +451,7 @@ class StudyTracker {
 
         let subject = subjectSelect.value;
         let isCustomSubject = false;
-        
+
         if (subject === 'Other') {
             subject = customSubject.value.trim();
             isCustomSubject = true;
@@ -471,54 +479,56 @@ class StudyTracker {
                 `Click "OK" to add it to your ${this.currentCategory === 'igcse' ? 'IGCSE Prep' : 'General Learning'} dropdown.\n` +
                 `Click "Cancel" to use it as a one-time subject only.`
             );
-            
+
             if (saveAsPreset) {
-                this.addCustomPreset(subject, this.currentCategory);
+                await this.addCustomPreset(subject, this.currentCategory);
                 this.updateManualSubjectDropdown();
             }
         }
 
         // Use date only (set to current time for the date)
         const dateTime = new Date(dateInput);
-        // Set to current time of day
         const now = new Date();
         dateTime.setHours(now.getHours(), now.getMinutes(), 0, 0);
 
-        // Create session object
-        const session = {
-            id: Date.now(),
-            date: dateTime.toISOString(),
-            subject: subject,
-            duration: duration
-        };
+        try {
+            // Create session via API
+            const session = await api.createSession({
+                date: dateTime.toISOString(),
+                subject: subject,
+                duration: duration,
+                category: this.currentCategory
+            });
 
-        // Add to sessions array
-        this.sessions.push(session);
-        this.sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
-        this.saveSessions();
+            // Add to local array
+            this.sessions.unshift(session);
+            this.sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        // Sync to Notion if enabled
-        if (this.notionIntegration) {
-            this.notionIntegration.onTimerComplete(session);
+            // Sync to Notion if enabled
+            if (this.notionIntegration) {
+                this.notionIntegration.onTimerComplete(session);
+            }
+
+            // Reset form
+            subjectSelect.value = '';
+            customSubject.value = '';
+            customSubject.style.display = 'none';
+            document.getElementById('manual-duration').value = '45';
+            this.setDefaultDateTime();
+
+            // Update subject filter
+            this.populateSubjectFilter();
+
+            // Update dashboard
+            this.renderDashboard();
+            this.updateSummary();
+
+            // Show success message
+            alert(`Session logged successfully! ${duration} minutes of ${subject}.`);
+        } catch (error) {
+            console.error('Error logging session:', error);
+            alert('Failed to log session. Please try again.');
         }
-
-        // Reset form
-        subjectSelect.value = '';
-        customSubject.value = '';
-        customSubject.style.display = 'none';
-        document.getElementById('manual-duration').value = '45';
-        this.setDefaultDateTime();
-        
-        // Update subject filter
-        this.populateSubjectFilter();
-
-        // Update dashboard
-        this.renderDashboard();
-        this.updateSummary();
-        this.populateSubjectFilter();
-
-        // Show success message
-        alert(`Session logged successfully! ${duration} minutes of ${subject}.`);
     }
 
     // Timer Functions (category-aware)
@@ -526,7 +536,7 @@ class StudyTracker {
         const prefix = category === 'igcse' ? 'igcse' : 'general';
         const subjectSelect = document.getElementById(`${prefix}-subject-select`);
         const customSubject = document.getElementById(`${prefix}-custom-subject`);
-        
+
         let subject = category === 'igcse' ? this.igcseCurrentSubject : this.generalCurrentSubject;
         if (!subject) {
             if (subjectSelect.value === 'Other') {
@@ -603,7 +613,7 @@ class StudyTracker {
     pauseTimer(category) {
         const prefix = category === 'igcse' ? 'igcse' : 'general';
         const pauseBtn = document.getElementById(`${prefix}-pause-btn`);
-        
+
         if (category === 'igcse') {
             this.igcseIsPaused = !this.igcseIsPaused;
             pauseBtn.textContent = this.igcseIsPaused ? 'Resume' : 'Pause';
@@ -625,7 +635,7 @@ class StudyTracker {
 
     resetTimer(category) {
         const prefix = category === 'igcse' ? 'igcse' : 'general';
-        
+
         if (category === 'igcse') {
             clearInterval(this.igcseTimerInterval);
             this.igcseIsRunning = false;
@@ -671,52 +681,68 @@ class StudyTracker {
         }
     }
 
-    completeSession(category) {
+    async completeSession(category) {
         const prefix = category === 'igcse' ? 'igcse' : 'general';
         const timerDuration = category === 'igcse' ? this.igcseTimerDuration : this.generalTimerDuration;
         const currentSubject = category === 'igcse' ? this.igcseCurrentSubject : this.generalCurrentSubject;
-        
+
         if (category === 'igcse') {
             clearInterval(this.igcseTimerInterval);
         } else {
             clearInterval(this.generalTimerInterval);
         }
-        
-        // Log the session
-        const session = {
-            id: Date.now(),
-            date: new Date().toISOString(),
-            subject: currentSubject,
-            duration: timerDuration
-        };
-        
-        this.sessions.push(session);
-        this.sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
-        this.saveSessions();
-        
-        // Ask if custom subject should be saved as preset
-        const isIgcseSubject = this.igcseSubjects.includes(currentSubject) || this.customIgcsePresets.includes(currentSubject);
-        if (!isIgcseSubject && category === 'igcse') {
-            const saveAsPreset = confirm(`Do you want to save "${currentSubject}" as an IGCSE preset?`);
-            if (saveAsPreset) {
-                this.addCustomPreset(currentSubject, 'igcse');
-                this.updateTimerSubjectDropdowns();
+
+        try {
+            // Log the session via API
+            const session = await api.createSession({
+                date: new Date().toISOString(),
+                subject: currentSubject,
+                duration: timerDuration,
+                category: category
+            });
+
+            this.sessions.unshift(session);
+            this.sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            // Ask if custom subject should be saved as preset
+            const isIgcseSubject = this.igcseSubjects.includes(currentSubject) || this.customIgcsePresets.includes(currentSubject);
+            if (!isIgcseSubject && category === 'igcse') {
+                const saveAsPreset = confirm(`Do you want to save "${currentSubject}" as an IGCSE preset?`);
+                if (saveAsPreset) {
+                    await this.addCustomPreset(currentSubject, 'igcse');
+                    this.updateTimerSubjectDropdowns();
+                }
+            } else if (category === 'general' && !this.customGeneralPresets.includes(currentSubject)) {
+                const saveAsPreset = confirm(`Do you want to save "${currentSubject}" as a General Learning preset?`);
+                if (saveAsPreset) {
+                    await this.addCustomPreset(currentSubject, 'general');
+                    this.updateTimerSubjectDropdowns();
+                }
             }
-        } else if (category === 'general' && !this.customGeneralPresets.includes(currentSubject)) {
-            const saveAsPreset = confirm(`Do you want to save "${currentSubject}" as a General Learning preset?`);
-            if (saveAsPreset) {
-                this.addCustomPreset(currentSubject, 'general');
-                this.updateTimerSubjectDropdowns();
+
+            alert(`Great job! You've completed ${timerDuration} minutes of ${currentSubject}. Session logged!`);
+
+            // Sync to Notion if enabled
+            if (this.notionIntegration) {
+                this.notionIntegration.onTimerComplete(session);
             }
+
+            // Update dashboard if on dashboard view
+            if (document.getElementById('dashboard-view').classList.contains('active')) {
+                this.renderDashboard();
+                this.updateSummary();
+                this.populateSubjectFilter();
+            }
+        } catch (error) {
+            console.error('Error saving session:', error);
+            alert('Session completed but failed to save. Please log it manually.');
         }
-        
-        alert(`Great job! You've completed ${timerDuration} minutes of ${currentSubject}. Session logged!`);
-        
+
         // Enable break timer
         document.getElementById(`${prefix}-start-break-btn`).disabled = false;
         document.getElementById(`${prefix}-skip-break-btn`).disabled = false;
         document.getElementById(`${prefix}-timer-label`).textContent = 'Session complete! Take a break?';
-        
+
         // Reset timer state
         if (category === 'igcse') {
             this.igcseIsRunning = false;
@@ -725,35 +751,23 @@ class StudyTracker {
             this.generalIsRunning = false;
             this.generalIsPaused = false;
         }
-        
+
         document.getElementById(`${prefix}-start-btn`).disabled = false;
         document.getElementById(`${prefix}-pause-btn`).disabled = true;
-        
-        // Sync to Notion if enabled
-        if (this.notionIntegration) {
-            this.notionIntegration.onTimerComplete(session);
-        }
-        
-        // Update dashboard if on dashboard view
-        if (document.getElementById('dashboard-view').classList.contains('active')) {
-            this.renderDashboard();
-            this.updateSummary();
-            this.populateSubjectFilter();
-        }
     }
 
     startBreak(category) {
         const prefix = category === 'igcse' ? 'igcse' : 'general';
-        
+
         if (category === 'igcse') {
             this.igcseIsBreak = true;
             this.igcseIsRunning = true;
             this.igcseBreakTimeRemaining = 5 * 60;
-            
+
             document.getElementById('igcse-start-break-btn').disabled = true;
             document.getElementById('igcse-skip-break-btn').disabled = true;
             document.getElementById('igcse-timer-label').textContent = 'Break time!';
-            
+
             this.igcseTimerInterval = setInterval(() => {
                 this.igcseBreakTimeRemaining--;
                 this.updateBreakDisplay('igcse');
@@ -765,11 +779,11 @@ class StudyTracker {
             this.generalIsBreak = true;
             this.generalIsRunning = true;
             this.generalBreakTimeRemaining = 5 * 60;
-            
+
             document.getElementById('general-start-break-btn').disabled = true;
             document.getElementById('general-skip-break-btn').disabled = true;
             document.getElementById('general-timer-label').textContent = 'Break time!';
-            
+
             this.generalTimerInterval = setInterval(() => {
                 this.generalBreakTimeRemaining--;
                 this.updateBreakDisplay('general');
@@ -783,7 +797,7 @@ class StudyTracker {
     skipBreak(category) {
         const prefix = category === 'igcse' ? 'igcse' : 'general';
         const timerDuration = category === 'igcse' ? this.igcseTimerDuration : this.generalTimerDuration;
-        
+
         if (category === 'igcse') {
             this.igcseIsBreak = false;
             clearInterval(this.igcseTimerInterval);
@@ -808,16 +822,16 @@ class StudyTracker {
     completeBreak(category) {
         const prefix = category === 'igcse' ? 'igcse' : 'general';
         const timerDuration = category === 'igcse' ? this.igcseTimerDuration : this.generalTimerDuration;
-        
+
         if (category === 'igcse') {
             clearInterval(this.igcseTimerInterval);
         } else {
             clearInterval(this.generalTimerInterval);
         }
-        
+
         alert('Break time is over! Ready for another session?');
         this.resetTimer(category);
-        
+
         if (category === 'igcse') {
             this.igcseTimeRemaining = timerDuration * 60;
             this.updateTimerDisplay('igcse');
@@ -831,18 +845,18 @@ class StudyTracker {
         const prefix = category === 'igcse' ? 'igcse' : 'general';
         const timeRemaining = category === 'igcse' ? this.igcseTimeRemaining : this.generalTimeRemaining;
         const timerDuration = category === 'igcse' ? this.igcseTimerDuration : this.generalTimerDuration;
-        
+
         const minutes = Math.floor(timeRemaining / 60);
         const seconds = timeRemaining % 60;
         const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         document.querySelector(`.timer-display-${category}`).textContent = display;
-        
+
         // Update progress circle
         const total = timerDuration * 60;
         const progress = 1 - (timeRemaining / total);
         const circumference = 2 * Math.PI * 90;
         const offset = circumference * (1 - progress);
-        
+
         const progressCircle = document.querySelector(`.timer-progress-${category}`);
         if (progressCircle) {
             progressCircle.style.strokeDashoffset = offset;
@@ -852,7 +866,7 @@ class StudyTracker {
     updateBreakDisplay(category) {
         const prefix = category === 'igcse' ? 'igcse' : 'general';
         const breakTimeRemaining = category === 'igcse' ? this.igcseBreakTimeRemaining : this.generalBreakTimeRemaining;
-        
+
         const minutes = Math.floor(breakTimeRemaining / 60);
         const seconds = breakTimeRemaining % 60;
         const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
@@ -862,7 +876,7 @@ class StudyTracker {
     // Dashboard Functions
     renderDashboard() {
         const filteredSessions = this.getFilteredSessions();
-        
+
         // Render based on current view mode
         switch(this.currentViewMode) {
             case 'table':
@@ -883,29 +897,29 @@ class StudyTracker {
     renderTableView(filteredSessions) {
         const tbody = document.getElementById('sessions-table-body');
         tbody.innerHTML = '';
-        
+
         if (filteredSessions.length === 0) {
             tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No study sessions match your filters.</td></tr>';
             return;
         }
-        
+
         filteredSessions.forEach(session => {
             const row = document.createElement('tr');
             const date = new Date(session.date);
-            const dateStr = date.toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'short', 
+            const dateStr = date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit'
             });
-            
+
             const hours = Math.floor(session.duration / 60);
             const minutes = session.duration % 60;
-            const durationStr = hours > 0 
-                ? `${hours}h ${minutes}m` 
+            const durationStr = hours > 0
+                ? `${hours}h ${minutes}m`
                 : `${minutes}m`;
-            
+
             row.innerHTML = `
                 <td>${dateStr}</td>
                 <td><span class="subject-badge">${session.subject}</span></td>
@@ -914,13 +928,13 @@ class StudyTracker {
                     <button class="btn-delete" data-id="${session.id}">Delete</button>
                 </td>
             `;
-            
+
             row.querySelector('.btn-delete').addEventListener('click', () => {
                 if (confirm('Are you sure you want to delete this session?')) {
                     this.deleteSession(session.id);
                 }
             });
-            
+
             tbody.appendChild(row);
         });
     }
@@ -928,30 +942,30 @@ class StudyTracker {
     renderCardsView(filteredSessions) {
         const container = document.getElementById('sessions-cards-body');
         container.innerHTML = '';
-        
+
         if (filteredSessions.length === 0) {
             container.innerHTML = '<div class="empty-state">No study sessions match your filters.</div>';
             return;
         }
-        
+
         filteredSessions.forEach(session => {
             const card = document.createElement('div');
             card.className = 'session-card';
             const date = new Date(session.date);
-            const dateStr = date.toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'short', 
+            const dateStr = date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit'
             });
-            
+
             const hours = Math.floor(session.duration / 60);
             const minutes = session.duration % 60;
-            const durationStr = hours > 0 
-                ? `${hours}h ${minutes}m` 
+            const durationStr = hours > 0
+                ? `${hours}h ${minutes}m`
                 : `${minutes}m`;
-            
+
             card.innerHTML = `
                 <div class="session-card-header">
                     <span class="subject-badge">${session.subject}</span>
@@ -962,13 +976,13 @@ class StudyTracker {
                     <div class="session-card-duration">${durationStr}</div>
                 </div>
             `;
-            
+
             card.querySelector('.btn-delete-small').addEventListener('click', () => {
                 if (confirm('Are you sure you want to delete this session?')) {
                     this.deleteSession(session.id);
                 }
             });
-            
+
             container.appendChild(card);
         });
     }
@@ -976,22 +990,22 @@ class StudyTracker {
     renderBarChart(filteredSessions) {
         const canvas = document.getElementById('bar-chart');
         const emptyDiv = document.getElementById('bar-chart-empty');
-        
+
         if (filteredSessions.length === 0) {
             canvas.style.display = 'none';
             emptyDiv.style.display = 'block';
             return;
         }
-        
+
         // Set canvas size
         const container = canvas.parentElement;
-        const containerWidth = container.clientWidth - 64; // padding
+        const containerWidth = container.clientWidth - 64;
         const containerHeight = 400;
         canvas.width = containerWidth;
         canvas.height = containerHeight;
         canvas.style.display = 'block';
         emptyDiv.style.display = 'none';
-        
+
         // Group by subject
         const subjectData = {};
         filteredSessions.forEach(session => {
@@ -1000,30 +1014,30 @@ class StudyTracker {
             }
             subjectData[session.subject] += session.duration;
         });
-        
+
         const subjects = Object.keys(subjectData).sort();
         const durations = subjects.map(s => subjectData[s]);
         const maxDuration = Math.max(...durations, 1);
-        
+
         const ctx = canvas.getContext('2d');
         const width = canvas.width;
         const height = canvas.height;
         const padding = 60;
         const barWidth = Math.max(40, (width - 2 * padding) / subjects.length);
         const maxBarHeight = height - 2 * padding;
-        
+
         // Clear canvas
         ctx.clearRect(0, 0, width, height);
-        
+
         // Draw bars
         subjects.forEach((subject, index) => {
             const barHeight = (durations[index] / maxDuration) * maxBarHeight;
             const x = padding + index * (barWidth + 10);
             const y = height - padding - barHeight;
-            
+
             ctx.fillStyle = this.getSubjectColor(subject);
             ctx.fillRect(x, y, barWidth, barHeight);
-            
+
             // Label
             ctx.fillStyle = '#1e293b';
             ctx.font = '12px Inter';
@@ -1033,7 +1047,7 @@ class StudyTracker {
             ctx.rotate(-Math.PI / 4);
             ctx.fillText(subject, 0, 0);
             ctx.restore();
-            
+
             // Value on top
             ctx.fillStyle = '#1e293b';
             ctx.font = 'bold 11px Inter';
@@ -1045,13 +1059,13 @@ class StudyTracker {
     renderPieChart(filteredSessions) {
         const canvas = document.getElementById('pie-chart');
         const emptyDiv = document.getElementById('pie-chart-empty');
-        
+
         if (filteredSessions.length === 0) {
             canvas.style.display = 'none';
             emptyDiv.style.display = 'block';
             return;
         }
-        
+
         // Set canvas size (square)
         const container = canvas.parentElement;
         const containerSize = Math.min(container.clientWidth - 64, 500);
@@ -1059,7 +1073,7 @@ class StudyTracker {
         canvas.height = containerSize;
         canvas.style.display = 'block';
         emptyDiv.style.display = 'none';
-        
+
         // Group by subject
         const subjectData = {};
         filteredSessions.forEach(session => {
@@ -1068,24 +1082,24 @@ class StudyTracker {
             }
             subjectData[session.subject] += session.duration;
         });
-        
+
         const subjects = Object.keys(subjectData);
         const durations = subjects.map(s => subjectData[s]);
         const total = durations.reduce((a, b) => a + b, 0);
-        
+
         const ctx = canvas.getContext('2d');
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
         const radius = Math.min(centerX, centerY) - 60;
-        
+
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
+
         let currentAngle = -Math.PI / 2;
-        
+
         subjects.forEach((subject, index) => {
             const sliceAngle = (durations[index] / total) * 2 * Math.PI;
-            
+
             // Draw slice
             ctx.beginPath();
             ctx.moveTo(centerX, centerY);
@@ -1093,27 +1107,27 @@ class StudyTracker {
             ctx.closePath();
             ctx.fillStyle = this.getSubjectColor(subject);
             ctx.fill();
-            
+
             // Draw border
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
             ctx.stroke();
-            
+
             // Draw label
             const labelAngle = currentAngle + sliceAngle / 2;
             const labelX = centerX + Math.cos(labelAngle) * (radius * 0.65);
             const labelY = centerY + Math.sin(labelAngle) * (radius * 0.65);
-            
+
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 13px Inter';
             ctx.textAlign = 'center';
             ctx.fillText(subject, labelX, labelY);
-            
+
             // Draw percentage
             const percent = ((durations[index] / total) * 100).toFixed(0);
             ctx.font = '11px Inter';
             ctx.fillText(`${percent}%`, labelX, labelY + 15);
-            
+
             currentAngle += sliceAngle;
         });
     }
@@ -1127,36 +1141,43 @@ class StudyTracker {
         return colors[index];
     }
 
-    deleteSession(id) {
-        this.sessions = this.sessions.filter(s => s.id !== id);
-        this.saveSessions();
-        this.renderDashboard();
-        this.updateSummary();
-        this.populateSubjectFilter();
+    async deleteSession(id) {
+        try {
+            await api.deleteSession(id);
+            this.sessions = this.sessions.filter(s => s.id !== id);
+            this.renderDashboard();
+            this.updateSummary();
+            this.populateSubjectFilter();
+        } catch (error) {
+            console.error('Error deleting session:', error);
+            alert('Failed to delete session. Please try again.');
+        }
     }
 
     updateSummary() {
         const now = new Date();
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        
-        // Filter by category - include custom presets
+
+        // Filter by category
         let categorySessions = this.sessions.filter(s => {
             if (this.currentCategory === 'igcse') {
-                return this.igcseSubjects.includes(s.subject) || 
-                       this.customIgcsePresets.includes(s.subject);
+                return this.igcseSubjects.includes(s.subject) ||
+                       this.customIgcsePresets.includes(s.subject) ||
+                       s.category === 'igcse';
             } else {
-                return !this.igcseSubjects.includes(s.subject) && 
-                       !this.customIgcsePresets.includes(s.subject);
+                return (!this.igcseSubjects.includes(s.subject) &&
+                       !this.customIgcsePresets.includes(s.subject)) ||
+                       s.category === 'general';
             }
         });
-        
+
         const weeklySessions = categorySessions.filter(s => new Date(s.date) >= weekAgo);
         const monthlySessions = categorySessions.filter(s => new Date(s.date) >= monthAgo);
-        
+
         const weeklyTotal = weeklySessions.reduce((sum, s) => sum + s.duration, 0);
         const monthlyTotal = monthlySessions.reduce((sum, s) => sum + s.duration, 0);
-        
+
         document.getElementById('weekly-total').textContent = this.formatDuration(weeklyTotal);
         document.getElementById('monthly-total').textContent = this.formatDuration(monthlyTotal);
         document.getElementById('total-sessions').textContent = categorySessions.length;
@@ -1171,20 +1192,22 @@ class StudyTracker {
     populateSubjectFilter() {
         const filter = document.getElementById('subject-filter');
         const currentValue = filter.value;
-        
-        // Get unique subjects filtered by category - include custom presets
+
+        // Get unique subjects filtered by category
         let categorySessions = this.sessions.filter(s => {
             if (this.currentCategory === 'igcse') {
-                return this.igcseSubjects.includes(s.subject) || 
-                       this.customIgcsePresets.includes(s.subject);
+                return this.igcseSubjects.includes(s.subject) ||
+                       this.customIgcsePresets.includes(s.subject) ||
+                       s.category === 'igcse';
             } else {
-                return !this.igcseSubjects.includes(s.subject) && 
-                       !this.customIgcsePresets.includes(s.subject);
+                return (!this.igcseSubjects.includes(s.subject) &&
+                       !this.customIgcsePresets.includes(s.subject)) ||
+                       s.category === 'general';
             }
         });
-        
+
         const subjects = [...new Set(categorySessions.map(s => s.subject))].sort();
-        
+
         // Clear and repopulate
         filter.innerHTML = '<option value="">All Subjects</option>';
         subjects.forEach(subject => {
@@ -1193,7 +1216,7 @@ class StudyTracker {
             option.textContent = subject;
             filter.appendChild(option);
         });
-        
+
         // Restore selection
         filter.value = currentValue;
     }
@@ -1229,12 +1252,12 @@ class StudyTracker {
         document.getElementById('prev-week-btn')?.addEventListener('click', () => {
             this.currentWeekStart = new Date(this.currentWeekStart);
             this.currentWeekStart.setDate(this.currentWeekStart.getDate() - 7);
-            this.renderPlanner();
+            this.loadPlannerTasksForWeek();
         });
         document.getElementById('next-week-btn')?.addEventListener('click', () => {
             this.currentWeekStart = new Date(this.currentWeekStart);
             this.currentWeekStart.setDate(this.currentWeekStart.getDate() + 7);
-            this.renderPlanner();
+            this.loadPlannerTasksForWeek();
         });
 
         // Clear week
@@ -1259,6 +1282,16 @@ class StudyTracker {
         });
     }
 
+    async loadPlannerTasksForWeek() {
+        try {
+            const weekStartStr = this.currentWeekStart.toISOString();
+            this.plannerTasks = await api.getPlannerTasks(weekStartStr);
+            this.renderPlanner();
+        } catch (error) {
+            console.error('Error loading planner tasks:', error);
+        }
+    }
+
     openTaskModal() {
         const modal = document.getElementById('task-modal');
         modal.style.display = 'flex';
@@ -1275,11 +1308,11 @@ class StudyTracker {
     populateTaskSubjectDropdown() {
         const dropdown = document.getElementById('task-subject');
         const category = document.getElementById('task-category')?.value || 'igcse';
-        
+
         if (!dropdown) return;
-        
+
         dropdown.innerHTML = '<option value="">Choose a subject...</option>';
-        
+
         if (category === 'igcse') {
             this.igcseSubjects.forEach(subject => {
                 const option = document.createElement('option');
@@ -1303,14 +1336,14 @@ class StudyTracker {
                 dropdown.appendChild(option);
             });
         }
-        
+
         const otherOption = document.createElement('option');
         otherOption.value = 'Other';
         otherOption.textContent = 'Other';
         dropdown.appendChild(otherOption);
     }
 
-    addTask() {
+    async addTask() {
         const subjectSelect = document.getElementById('task-subject');
         const customSubject = document.getElementById('task-custom-subject');
         const duration = parseInt(document.getElementById('task-duration').value);
@@ -1327,26 +1360,28 @@ class StudyTracker {
             return;
         }
 
-        const task = {
-            id: Date.now(),
-            subject: subject,
-            duration: duration,
-            day: day,
-            category: category,
-            completed: false,
-            weekStart: this.currentWeekStart.toISOString()
-        };
+        try {
+            const task = await api.createPlannerTask({
+                subject: subject,
+                duration: duration,
+                day: day,
+                category: category,
+                weekStart: this.currentWeekStart.toISOString()
+            });
 
-        this.plannerTasks.push(task);
-        this.savePlannerTasks();
-        this.renderPlanner();
-        this.closeTaskModal();
+            this.plannerTasks.push(task);
+            this.renderPlanner();
+            this.closeTaskModal();
+        } catch (error) {
+            console.error('Error adding task:', error);
+            alert('Failed to add task. Please try again.');
+        }
     }
 
     renderPlanner() {
         // Update week display
         const weekEnd = new Date(this.currentWeekStart);
-        weekEnd.setDate(weekEnd.getDate() + 4); // Friday
+        weekEnd.setDate(weekEnd.getDate() + 4);
         const weekDisplay = document.getElementById('current-week-display');
         if (weekDisplay) {
             weekDisplay.textContent = `Week of ${this.formatWeekDate(this.currentWeekStart)}`;
@@ -1364,9 +1399,10 @@ class StudyTracker {
         });
 
         // Filter tasks for current week
+        const weekStartStr = this.currentWeekStart.toISOString();
         const weekTasks = this.plannerTasks.filter(task => {
-            const taskWeekStart = new Date(task.weekStart);
-            return taskWeekStart.getTime() === this.currentWeekStart.getTime();
+            const taskWeekStart = new Date(task.week_start || task.weekStart);
+            return taskWeekStart.toISOString().split('T')[0] === this.currentWeekStart.toISOString().split('T')[0];
         });
 
         // Render tasks for each day
@@ -1374,7 +1410,7 @@ class StudyTracker {
             const dayTasks = weekTasks.filter(task => task.day === day);
             const container = document.getElementById(`${day}-tasks`);
             if (!container) return;
-            
+
             container.innerHTML = '';
 
             if (dayTasks.length === 0) {
@@ -1448,96 +1484,106 @@ class StudyTracker {
         return taskDiv;
     }
 
-    toggleTaskComplete(taskId, completed) {
-        const task = this.plannerTasks.find(t => t.id === taskId);
-        if (task) {
-            task.completed = completed;
-            this.savePlannerTasks();
-            this.renderPlanner();
+    async toggleTaskComplete(taskId, completed) {
+        try {
+            const task = this.plannerTasks.find(t => t.id === taskId);
+            if (task) {
+                await api.updatePlannerTask(taskId, { completed });
+                task.completed = completed;
+                this.renderPlanner();
 
-            // When task is checked off, log it as a session
-            if (completed) {
-                this.logTaskAsSession(task);
+                // When task is checked off, log it as a session
+                if (completed) {
+                    await this.logTaskAsSession(task);
+                }
             }
+        } catch (error) {
+            console.error('Error toggling task:', error);
         }
     }
 
-    logTaskAsSession(task) {
+    async logTaskAsSession(task) {
         // Calculate the date for this task's day
-        const taskWeekStart = new Date(task.weekStart);
+        const taskWeekStart = new Date(task.week_start || task.weekStart);
         const dayIndex = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].indexOf(task.day);
         const taskDate = new Date(taskWeekStart);
         taskDate.setDate(taskDate.getDate() + dayIndex);
-        
+
         // Set to current time of day
         const now = new Date();
         taskDate.setHours(now.getHours(), now.getMinutes(), 0, 0);
 
-        // Check if session already exists for this task (to avoid duplicates)
-        const existingSession = this.sessions.find(s => 
-            s.subject === task.subject &&
-            s.duration === task.duration &&
-            new Date(s.date).toDateString() === taskDate.toDateString() &&
-            s.plannerTaskId === task.id
+        // Check if session already exists for this task
+        const existingSession = this.sessions.find(s =>
+            s.planner_task_id === task.id
         );
 
         if (existingSession) {
-            // Session already logged for this task
             return;
         }
 
-        // Create session object
-        const session = {
-            id: Date.now(),
-            date: taskDate.toISOString(),
-            subject: task.subject,
-            duration: task.duration,
-            plannerTaskId: task.id // Track which planner task created this
-        };
+        try {
+            const session = await api.createSession({
+                date: taskDate.toISOString(),
+                subject: task.subject,
+                duration: task.duration,
+                category: task.category,
+                plannerTaskId: task.id
+            });
 
-        // Add to sessions array
-        this.sessions.push(session);
-        this.sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
-        this.saveSessions();
+            this.sessions.unshift(session);
+            this.sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        // Sync to Notion if enabled
-        if (this.notionIntegration) {
-            this.notionIntegration.onSessionCreated(session);
+            // Sync to Notion if enabled
+            if (this.notionIntegration) {
+                this.notionIntegration.onSessionCreated(session);
+            }
+
+            // Update dashboard if visible
+            if (document.getElementById('dashboard-view')?.classList.contains('active')) {
+                this.renderDashboard();
+                this.updateSummary();
+                this.populateSubjectFilter();
+            }
+
+            const hours = Math.floor(task.duration / 60);
+            const minutes = task.duration % 60;
+            const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+            console.log(`Logged: ${durationStr} of ${task.subject}`);
+        } catch (error) {
+            console.error('Error logging task as session:', error);
         }
-
-        // Update dashboard if it's currently visible
-        if (document.getElementById('dashboard-view')?.classList.contains('active')) {
-            this.renderDashboard();
-            this.updateSummary();
-            this.populateSubjectFilter();
-        }
-
-        // Show confirmation
-        const hours = Math.floor(task.duration / 60);
-        const minutes = task.duration % 60;
-        const durationStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-        console.log(`✅ Logged: ${durationStr} of ${task.subject} on ${taskDate.toLocaleDateString()}`);
     }
 
-    deleteTask(taskId) {
-        this.plannerTasks = this.plannerTasks.filter(t => t.id !== taskId);
-        this.savePlannerTasks();
-        this.renderPlanner();
+    async deleteTask(taskId) {
+        try {
+            await api.deletePlannerTask(taskId);
+            this.plannerTasks = this.plannerTasks.filter(t => t.id !== taskId);
+            this.renderPlanner();
+        } catch (error) {
+            console.error('Error deleting task:', error);
+            alert('Failed to delete task. Please try again.');
+        }
     }
 
-    clearCurrentWeek() {
-        this.plannerTasks = this.plannerTasks.filter(task => {
-            const taskWeekStart = new Date(task.weekStart);
-            return taskWeekStart.getTime() !== this.currentWeekStart.getTime();
-        });
-        this.savePlannerTasks();
-        this.renderPlanner();
+    async clearCurrentWeek() {
+        try {
+            await api.clearPlannerWeek(this.currentWeekStart.toISOString());
+            this.plannerTasks = this.plannerTasks.filter(task => {
+                const taskWeekStart = new Date(task.week_start || task.weekStart);
+                return taskWeekStart.toISOString().split('T')[0] !== this.currentWeekStart.toISOString().split('T')[0];
+            });
+            this.renderPlanner();
+        } catch (error) {
+            console.error('Error clearing week:', error);
+            alert('Failed to clear week. Please try again.');
+        }
     }
 
     // Initialize drag and drop for tasks
     initDragAndDrop() {
         const dayContainers = document.querySelectorAll('.day-tasks');
-        
+
         dayContainers.forEach(container => {
             container.addEventListener('dragover', (e) => {
                 e.preventDefault();
@@ -1551,7 +1597,7 @@ class StudyTracker {
             container.addEventListener('drop', (e) => {
                 e.preventDefault();
                 container.classList.remove('drag-over');
-                
+
                 const taskId = parseInt(e.dataTransfer.getData('text/plain'));
                 const newDay = container.dataset.day;
                 this.moveTask(taskId, newDay);
@@ -1559,12 +1605,69 @@ class StudyTracker {
         });
     }
 
-    moveTask(taskId, newDay) {
-        const task = this.plannerTasks.find(t => t.id === taskId);
-        if (task) {
-            task.day = newDay;
-            this.savePlannerTasks();
-            this.renderPlanner();
+    async moveTask(taskId, newDay) {
+        try {
+            const task = this.plannerTasks.find(t => t.id === taskId);
+            if (task) {
+                await api.updatePlannerTask(taskId, { day: newDay });
+                task.day = newDay;
+                this.renderPlanner();
+            }
+        } catch (error) {
+            console.error('Error moving task:', error);
+        }
+    }
+
+    // Timer subject dropdowns
+    updateTimerSubjectDropdowns() {
+        // Update IGCSE timer dropdown
+        const igcseDropdown = document.getElementById('igcse-subject-select');
+        if (igcseDropdown) {
+            igcseDropdown.innerHTML = '<option value="">Select subject...</option>';
+            this.igcseSubjects.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject;
+                option.textContent = subject;
+                igcseDropdown.appendChild(option);
+            });
+            this.customIgcsePresets.forEach(subject => {
+                if (!this.igcseSubjects.includes(subject)) {
+                    const option = document.createElement('option');
+                    option.value = subject;
+                    option.textContent = subject;
+                    igcseDropdown.appendChild(option);
+                }
+            });
+            const otherOption = document.createElement('option');
+            otherOption.value = 'Other';
+            otherOption.textContent = 'Other';
+            igcseDropdown.appendChild(otherOption);
+        }
+
+        // Update General timer dropdown
+        const generalDropdown = document.getElementById('general-subject-select');
+        if (generalDropdown) {
+            generalDropdown.innerHTML = '<option value="">Select subject...</option>';
+            this.customGeneralPresets.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject;
+                option.textContent = subject;
+                generalDropdown.appendChild(option);
+            });
+            const otherOption = document.createElement('option');
+            otherOption.value = 'Other';
+            otherOption.textContent = 'Other';
+            generalDropdown.appendChild(otherOption);
+        }
+    }
+
+    // Initialize timer circle
+    initializeTimerCircle(category) {
+        const circumference = 2 * Math.PI * 90;
+        const progressCircle = document.querySelector(`.timer-progress-${category}`);
+        if (progressCircle) {
+            progressCircle.style.strokeDasharray = circumference;
+            progressCircle.style.strokeDashoffset = 0;
         }
     }
 }
@@ -1573,4 +1676,3 @@ class StudyTracker {
 document.addEventListener('DOMContentLoaded', () => {
     new StudyTracker();
 });
-

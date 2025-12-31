@@ -68,6 +68,12 @@
           </li>
           <li class="nav-section">Study</li>
           <li class="nav-item">
+            <a href="#" class="nav-link" data-view="study-timer">
+              <span class="nav-icon">&#9201;</span>
+              Timer
+            </a>
+          </li>
+          <li class="nav-item">
             <a href="#" class="nav-link" data-view="study-plan">
               <span class="nav-icon">&#9744;</span>
               Plan
@@ -80,6 +86,12 @@
             </a>
           </li>
           <li class="nav-section">Football</li>
+          <li class="nav-item">
+            <a href="#" class="nav-link" data-view="football-timer">
+              <span class="nav-icon">&#9201;</span>
+              Timer
+            </a>
+          </li>
           <li class="nav-item">
             <a href="#" class="nav-link" data-view="football-plan">
               <span class="nav-icon">&#9917;</span>
@@ -167,6 +179,66 @@
           </div>
         </section>
 
+        <!-- Study Timer View -->
+        <section id="study-timer-view" class="view">
+          <div class="view-header">
+            <h2>Study Timer</h2>
+            <p class="view-subtitle">Pomodoro-style focus sessions</p>
+          </div>
+
+          <div class="timer-container">
+            <div class="timer-card">
+              <div class="timer-setup" id="study-timer-setup">
+                <div class="form-group">
+                  <label>Subject</label>
+                  <select id="study-timer-category" class="form-select">
+                    <!-- Categories populated by JS -->
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Duration (minutes)</label>
+                  <select id="study-timer-duration" class="form-select">
+                    <option value="15">15 minutes</option>
+                    <option value="25">25 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="45" selected>45 minutes</option>
+                    <option value="60">60 minutes</option>
+                    <option value="90">90 minutes</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="timer-display">
+                <div class="timer-circle">
+                  <svg class="timer-svg" viewBox="0 0 100 100">
+                    <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
+                    <circle class="timer-progress" id="study-timer-progress" cx="50" cy="50" r="45"></circle>
+                  </svg>
+                  <div class="timer-text">
+                    <span id="study-timer-display" class="timer-time">45:00</span>
+                    <span id="study-timer-label" class="timer-label">Ready to start</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="timer-controls">
+                <button id="study-start-btn" class="btn btn-success">Start</button>
+                <button id="study-pause-btn" class="btn btn-secondary" disabled>Pause</button>
+                <button id="study-reset-btn" class="btn btn-ghost">Reset</button>
+              </div>
+
+              <div class="break-section" id="study-break-section" style="display: none;">
+                <h3>Break Time!</h3>
+                <div id="study-break-display" class="break-timer">5:00</div>
+                <div class="break-controls">
+                  <button id="study-start-break-btn" class="btn btn-primary">Start Break</button>
+                  <button id="study-skip-break-btn" class="btn btn-ghost">Skip Break</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Study Plan View -->
         <section id="study-plan-view" class="view">
           <div class="view-header">
@@ -201,6 +273,74 @@
           </div>
           <div class="log-list" id="study-log-list">
             <p class="empty-state">No study logs yet</p>
+          </div>
+        </section>
+
+        <!-- Football Timer View -->
+        <section id="football-timer-view" class="view">
+          <div class="view-header">
+            <h2>Football Timer</h2>
+            <p class="view-subtitle">Track your training sessions</p>
+          </div>
+
+          <div class="timer-container">
+            <div class="timer-card">
+              <div class="timer-setup" id="football-timer-setup">
+                <div class="form-group">
+                  <label>Activity</label>
+                  <select id="football-timer-category" class="form-select">
+                    <!-- Categories populated by JS -->
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Duration (minutes)</label>
+                  <select id="football-timer-duration" class="form-select">
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="45" selected>45 minutes</option>
+                    <option value="60">60 minutes</option>
+                    <option value="90">90 minutes</option>
+                    <option value="120">120 minutes</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Intensity</label>
+                  <select id="football-timer-intensity" class="form-select">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="timer-display">
+                <div class="timer-circle football">
+                  <svg class="timer-svg" viewBox="0 0 100 100">
+                    <circle class="timer-bg" cx="50" cy="50" r="45"></circle>
+                    <circle class="timer-progress football" id="football-timer-progress" cx="50" cy="50" r="45"></circle>
+                  </svg>
+                  <div class="timer-text">
+                    <span id="football-timer-display" class="timer-time">45:00</span>
+                    <span id="football-timer-label" class="timer-label">Ready to start</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="timer-controls">
+                <button id="football-start-btn" class="btn btn-success">Start</button>
+                <button id="football-pause-btn" class="btn btn-secondary" disabled>Pause</button>
+                <button id="football-reset-btn" class="btn btn-ghost">Reset</button>
+              </div>
+
+              <div class="break-section" id="football-break-section" style="display: none;">
+                <h3>Recovery Time!</h3>
+                <div id="football-break-display" class="break-timer">5:00</div>
+                <div class="break-controls">
+                  <button id="football-start-break-btn" class="btn btn-primary">Start Recovery</button>
+                  <button id="football-skip-break-btn" class="btn btn-ghost">Skip</button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

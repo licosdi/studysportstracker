@@ -10,6 +10,31 @@ class LogbookApp {
     this.analyticsMode = 'weekly';
     this.analyticsDate = new Date();
 
+    // Timer state
+    this.timers = {
+      study: {
+        duration: 45,
+        remaining: 45 * 60,
+        breakRemaining: 5 * 60,
+        isRunning: false,
+        isPaused: false,
+        isBreak: false,
+        interval: null,
+        categoryId: null
+      },
+      football: {
+        duration: 45,
+        remaining: 45 * 60,
+        breakRemaining: 5 * 60,
+        isRunning: false,
+        isPaused: false,
+        isBreak: false,
+        interval: null,
+        categoryId: null,
+        intensity: 'medium'
+      }
+    };
+
     this.init();
   }
 
@@ -268,6 +293,27 @@ class LogbookApp {
     document.getElementById('modal-overlay').addEventListener('click', (e) => {
       if (e.target === document.getElementById('modal-overlay')) this.closeModal();
     });
+
+    // Timer event listeners
+    this.setupTimerListeners();
+  }
+
+  setupTimerListeners() {
+    // Study timer
+    document.getElementById('study-start-btn')?.addEventListener('click', () => this.startTimer('study'));
+    document.getElementById('study-pause-btn')?.addEventListener('click', () => this.pauseTimer('study'));
+    document.getElementById('study-reset-btn')?.addEventListener('click', () => this.resetTimer('study'));
+    document.getElementById('study-timer-duration')?.addEventListener('change', (e) => this.setTimerDuration('study', parseInt(e.target.value)));
+    document.getElementById('study-start-break-btn')?.addEventListener('click', () => this.startBreak('study'));
+    document.getElementById('study-skip-break-btn')?.addEventListener('click', () => this.skipBreak('study'));
+
+    // Football timer
+    document.getElementById('football-start-btn')?.addEventListener('click', () => this.startTimer('football'));
+    document.getElementById('football-pause-btn')?.addEventListener('click', () => this.pauseTimer('football'));
+    document.getElementById('football-reset-btn')?.addEventListener('click', () => this.resetTimer('football'));
+    document.getElementById('football-timer-duration')?.addEventListener('change', (e) => this.setTimerDuration('football', parseInt(e.target.value)));
+    document.getElementById('football-start-break-btn')?.addEventListener('click', () => this.startBreak('football'));
+    document.getElementById('football-skip-break-btn')?.addEventListener('click', () => this.skipBreak('football'));
   }
 
   navigateTo(view) {
@@ -280,13 +326,246 @@ class LogbookApp {
     // Load view data
     switch (view) {
       case 'dashboard': this.loadDashboard(); break;
+      case 'study-timer': this.loadStudyTimer(); break;
       case 'study-plan': this.loadStudyPlan(); break;
       case 'study-log': this.loadStudyLogs(); break;
+      case 'football-timer': this.loadFootballTimer(); break;
       case 'football-plan': this.loadFootballPlan(); break;
       case 'football-log': this.loadFootballLogs(); break;
       case 'analytics': this.loadAnalytics(); break;
       case 'settings': this.loadSettings(); break;
     }
+  }
+
+  // ==================== TIMER ====================
+
+  loadStudyTimer() {
+    this.populateTimerCategories('study');
+    this.updateTimerDisplay('study');
+  }
+
+  loadFootballTimer() {
+    this.populateTimerCategories('football');
+    this.updateTimerDisplay('football');
+  }
+
+  populateTimerCategories(area) {
+    const select = document.getElementById(`${area}-timer-category`);
+    if (!select) return;
+
+    const categories = area === 'study' ? this.studyCategories : this.footballCategories;
+    const activeCategories = categories.filter(c => c.isActive);
+
+    select.innerHTML = activeCategories.map(c =>
+      `<option value="${c.id}">${c.name}</option>`
+    ).join('');
+
+    // Store selected category
+    if (activeCategories.length > 0) {
+      this.timers[area].categoryId = activeCategories[0].id;
+    }
+
+    select.addEventListener('change', (e) => {
+      this.timers[area].categoryId = parseInt(e.target.value);
+    });
+  }
+
+  setTimerDuration(area, minutes) {
+    this.timers[area].duration = minutes;
+    this.timers[area].remaining = minutes * 60;
+    this.updateTimerDisplay(area);
+    this.updateTimerProgress(area);
+  }
+
+  updateTimerDisplay(area) {
+    const timer = this.timers[area];
+    const display = document.getElementById(`${area}-timer-display`);
+    if (!display) return;
+
+    const minutes = Math.floor(timer.remaining / 60);
+    const seconds = timer.remaining % 60;
+    display.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  updateTimerProgress(area) {
+    const timer = this.timers[area];
+    const progress = document.getElementById(`${area}-timer-progress`);
+    if (!progress) return;
+
+    const totalSeconds = timer.duration * 60;
+    const circumference = 2 * Math.PI * 45; // r=45 from SVG
+    const offset = circumference * (1 - timer.remaining / totalSeconds);
+    progress.style.strokeDashoffset = offset;
+  }
+
+  updateBreakDisplay(area) {
+    const timer = this.timers[area];
+    const display = document.getElementById(`${area}-break-display`);
+    if (!display) return;
+
+    const minutes = Math.floor(timer.breakRemaining / 60);
+    const seconds = timer.breakRemaining % 60;
+    display.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  startTimer(area) {
+    const timer = this.timers[area];
+    const categorySelect = document.getElementById(`${area}-timer-category`);
+
+    if (!categorySelect?.value) {
+      alert('Please select a category first.');
+      return;
+    }
+
+    timer.categoryId = parseInt(categorySelect.value);
+    timer.isRunning = true;
+    timer.isPaused = false;
+
+    // Get category name for label
+    const categories = area === 'study' ? this.studyCategories : this.footballCategories;
+    const category = categories.find(c => c.id === timer.categoryId);
+    const label = document.getElementById(`${area}-timer-label`);
+    if (label && category) {
+      label.textContent = `Working: ${category.name}`;
+    }
+
+    // Disable controls
+    document.getElementById(`${area}-start-btn`).disabled = true;
+    document.getElementById(`${area}-pause-btn`).disabled = false;
+    document.getElementById(`${area}-timer-category`).disabled = true;
+    document.getElementById(`${area}-timer-duration`).disabled = true;
+
+    // Start interval
+    timer.interval = setInterval(() => {
+      if (timer.isBreak) {
+        timer.breakRemaining--;
+        this.updateBreakDisplay(area);
+        if (timer.breakRemaining <= 0) {
+          this.completeBreak(area);
+        }
+      } else {
+        timer.remaining--;
+        this.updateTimerDisplay(area);
+        this.updateTimerProgress(area);
+        if (timer.remaining <= 0) {
+          this.completeSession(area);
+        }
+      }
+    }, 1000);
+  }
+
+  pauseTimer(area) {
+    const timer = this.timers[area];
+    const pauseBtn = document.getElementById(`${area}-pause-btn`);
+
+    if (timer.isPaused) {
+      // Resume
+      timer.isPaused = false;
+      pauseBtn.textContent = 'Pause';
+      this.startTimer(area);
+    } else {
+      // Pause
+      timer.isPaused = true;
+      pauseBtn.textContent = 'Resume';
+      clearInterval(timer.interval);
+    }
+  }
+
+  resetTimer(area) {
+    const timer = this.timers[area];
+
+    clearInterval(timer.interval);
+    timer.isRunning = false;
+    timer.isPaused = false;
+    timer.isBreak = false;
+    timer.remaining = timer.duration * 60;
+    timer.breakRemaining = 5 * 60;
+
+    // Re-enable controls
+    document.getElementById(`${area}-start-btn`).disabled = false;
+    document.getElementById(`${area}-pause-btn`).disabled = true;
+    document.getElementById(`${area}-pause-btn`).textContent = 'Pause';
+    document.getElementById(`${area}-timer-category`).disabled = false;
+    document.getElementById(`${area}-timer-duration`).disabled = false;
+
+    // Hide break section
+    document.getElementById(`${area}-break-section`).style.display = 'none';
+
+    // Update displays
+    const label = document.getElementById(`${area}-timer-label`);
+    if (label) label.textContent = 'Ready to start';
+
+    this.updateTimerDisplay(area);
+    this.updateTimerProgress(area);
+    this.updateBreakDisplay(area);
+  }
+
+  async completeSession(area) {
+    const timer = this.timers[area];
+    clearInterval(timer.interval);
+
+    // Get category info
+    const categories = area === 'study' ? this.studyCategories : this.footballCategories;
+    const category = categories.find(c => c.id === timer.categoryId);
+
+    try {
+      // Log the session
+      const logData = {
+        area,
+        dateTime: new Date().toISOString(),
+        categoryId: timer.categoryId,
+        title: `${category?.name || 'Session'} (Timer)`,
+        durationMinutes: timer.duration,
+        notes: 'Completed via Pomodoro timer'
+      };
+
+      if (area === 'football') {
+        logData.intensity = document.getElementById('football-timer-intensity')?.value || 'medium';
+      }
+
+      await api.createLog(logData);
+
+      alert(`Great job! You completed ${timer.duration} minutes of ${category?.name || area}!`);
+
+      // Show break section
+      timer.isBreak = true;
+      document.getElementById(`${area}-break-section`).style.display = 'block';
+      document.getElementById(`${area}-start-btn`).disabled = true;
+      document.getElementById(`${area}-pause-btn`).disabled = true;
+
+      const label = document.getElementById(`${area}-timer-label`);
+      if (label) label.textContent = 'Session complete!';
+
+    } catch (error) {
+      console.error('Failed to log session:', error);
+      alert('Session completed but failed to save. Please log manually.');
+    }
+  }
+
+  startBreak(area) {
+    const timer = this.timers[area];
+    timer.interval = setInterval(() => {
+      timer.breakRemaining--;
+      this.updateBreakDisplay(area);
+      if (timer.breakRemaining <= 0) {
+        this.completeBreak(area);
+      }
+    }, 1000);
+
+    document.getElementById(`${area}-start-break-btn`).disabled = true;
+  }
+
+  skipBreak(area) {
+    this.completeBreak(area);
+  }
+
+  completeBreak(area) {
+    const timer = this.timers[area];
+    clearInterval(timer.interval);
+
+    // Reset for next session
+    this.resetTimer(area);
+    alert('Break complete! Ready for the next session.');
   }
 
   // ==================== STUDY PLAN ====================

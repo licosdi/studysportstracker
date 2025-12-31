@@ -1,4 +1,4 @@
-// Notion Integration for Study Tracker
+// Notion Integration for Study Tracker - Backend API Version
 class NotionIntegration {
     constructor(studyTracker) {
         this.studyTracker = studyTracker;
@@ -7,41 +7,50 @@ class NotionIntegration {
         this.isConnected = false;
         this.autoSync = true;
         this.syncOnTimerComplete = true;
-        
+
         this.init();
     }
 
-    init() {
-        this.loadConfig();
+    async init() {
+        await this.loadConfig();
         this.setupEventListeners();
         this.updateUI();
     }
 
-    loadConfig() {
-        const config = localStorage.getItem('notionConfig');
-        if (config) {
-            const parsed = JSON.parse(config);
-            this.notionToken = parsed.token;
-            this.databaseId = parsed.databaseId;
-            this.autoSync = parsed.autoSync !== false;
-            this.syncOnTimerComplete = parsed.syncOnTimerComplete !== false;
-            this.isConnected = !!(this.notionToken && this.databaseId);
+    async loadConfig() {
+        try {
+            const config = await api.getNotionConfigFull();
+            if (config) {
+                this.notionToken = config.token;
+                this.databaseId = config.database_id;
+                this.autoSync = config.auto_sync !== 0;
+                this.syncOnTimerComplete = config.sync_on_timer_complete !== 0;
+                this.isConnected = !!(this.notionToken && this.databaseId);
+            }
+        } catch (error) {
+            console.error('Error loading Notion config:', error);
+            this.isConnected = false;
         }
     }
 
-    saveConfig() {
-        localStorage.setItem('notionConfig', JSON.stringify({
-            token: this.notionToken,
-            databaseId: this.databaseId,
-            autoSync: this.autoSync,
-            syncOnTimerComplete: this.syncOnTimerComplete
-        }));
+    async saveConfig() {
+        try {
+            await api.saveNotionConfig({
+                token: this.notionToken,
+                databaseId: this.databaseId,
+                autoSync: this.autoSync,
+                syncOnTimerComplete: this.syncOnTimerComplete
+            });
+        } catch (error) {
+            console.error('Error saving Notion config:', error);
+            throw error;
+        }
     }
 
     setupEventListeners() {
         // Connect button
         document.getElementById('connect-notion-btn')?.addEventListener('click', () => {
-            document.querySelector('.notion-setup').style.display = 
+            document.querySelector('.notion-setup').style.display =
                 document.querySelector('.notion-setup').style.display === 'none' ? 'block' : 'block';
         });
 
@@ -72,7 +81,7 @@ class NotionIntegration {
         });
     }
 
-    connect() {
+    async connect() {
         const token = document.getElementById('notion-token').value.trim();
         const databaseId = document.getElementById('notion-database-id').value.trim();
 
@@ -89,29 +98,39 @@ class NotionIntegration {
         this.notionToken = token;
         this.databaseId = databaseId;
         this.isConnected = true;
-        this.saveConfig();
-        this.updateUI();
-        this.showSyncStatus('success', 'Notion connected successfully!');
-        
-        // Test connection
-        this.testConnection();
+
+        try {
+            await this.saveConfig();
+            this.updateUI();
+            this.showSyncStatus('success', 'Notion connected successfully!');
+
+            // Test connection
+            this.testConnection();
+        } catch (error) {
+            this.showSyncStatus('error', 'Failed to save Notion configuration.');
+            this.isConnected = false;
+        }
     }
 
-    disconnect() {
+    async disconnect() {
         if (confirm('Are you sure you want to disconnect from Notion?')) {
-            this.notionToken = null;
-            this.databaseId = null;
-            this.isConnected = false;
-            this.saveConfig();
-            this.updateUI();
-            this.showSyncStatus('info', 'Disconnected from Notion');
+            try {
+                await api.deleteNotionConfig();
+                this.notionToken = null;
+                this.databaseId = null;
+                this.isConnected = false;
+                this.updateUI();
+                this.showSyncStatus('info', 'Disconnected from Notion');
+            } catch (error) {
+                this.showSyncStatus('error', 'Failed to disconnect from Notion.');
+            }
         }
     }
 
     updateUI() {
         const connectedDiv = document.getElementById('notion-connected');
         const disconnectedDiv = document.getElementById('notion-disconnected');
-        
+
         if (this.isConnected) {
             connectedDiv.style.display = 'block';
             disconnectedDiv.style.display = 'none';
@@ -141,7 +160,7 @@ class NotionIntegration {
 
             if (response.ok) {
                 const data = await response.json();
-                document.getElementById('notion-database-name').textContent = 
+                document.getElementById('notion-database-name').textContent =
                     `Database: ${data.title?.[0]?.plain_text || 'Study Sessions'}`;
                 this.showSyncStatus('success', 'Connection verified!');
             } else {
@@ -158,7 +177,9 @@ class NotionIntegration {
         try {
             // Determine category
             const igcseSubjects = ['Math', 'English', 'Physics', 'Psychology', 'Business', 'Geography'];
-            const category = igcseSubjects.includes(session.subject) ? 'IGCSE Prep' : 'General Learning';
+            const category = session.category === 'igcse' || igcseSubjects.includes(session.subject)
+                ? 'IGCSE Prep'
+                : 'General Learning';
 
             const response = await fetch('https://api.notion.com/v1/pages', {
                 method: 'POST',
@@ -216,7 +237,7 @@ class NotionIntegration {
         }
 
         this.showSyncStatus('info', 'Syncing sessions to Notion...');
-        
+
         const sessions = this.studyTracker.sessions;
         let successCount = 0;
         let failCount = 0;
@@ -242,7 +263,7 @@ class NotionIntegration {
     showSyncStatus(type, message) {
         const statusDiv = document.getElementById('sync-status');
         const messageP = document.getElementById('sync-message');
-        
+
         if (!statusDiv || !messageP) return;
 
         statusDiv.style.display = 'block';
@@ -269,4 +290,3 @@ class NotionIntegration {
         }
     }
 }
-
