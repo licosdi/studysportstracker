@@ -74,15 +74,15 @@
             </a>
           </li>
           <li class="nav-item">
-            <a href="#" class="nav-link" data-view="study-plan">
+            <a href="#" class="nav-link" data-view="study-weekly-plan">
               <span class="nav-icon">&#9744;</span>
-              Plan
+              Weekly Plan
             </a>
           </li>
           <li class="nav-item">
-            <a href="#" class="nav-link" data-view="study-log">
-              <span class="nav-icon">&#9997;</span>
-              Log
+            <a href="#" class="nav-link" data-view="study-stats">
+              <span class="nav-icon">&#128202;</span>
+              Stats
             </a>
           </li>
           <li class="nav-section">Football</li>
@@ -93,20 +93,13 @@
             </a>
           </li>
           <li class="nav-item">
-            <a href="#" class="nav-link" data-view="football-plan">
+            <a href="#" class="nav-link" data-view="football-weekly-plan">
               <span class="nav-icon">&#9917;</span>
-              Plan
+              Weekly Plan
             </a>
           </li>
           <li class="nav-item">
-            <a href="#" class="nav-link" data-view="football-log">
-              <span class="nav-icon">&#9997;</span>
-              Log
-            </a>
-          </li>
-          <li class="nav-section">Analytics</li>
-          <li class="nav-item">
-            <a href="#" class="nav-link" data-view="analytics">
+            <a href="#" class="nav-link" data-view="football-stats">
               <span class="nav-icon">&#128202;</span>
               Stats
             </a>
@@ -162,10 +155,10 @@
           <div class="dashboard-row">
             <div class="card">
               <div class="card-header">
-                <h3>Pending Plans Today</h3>
+                <h3>Today's Schedule</h3>
               </div>
               <div class="card-body" id="pending-plans-list">
-                <p class="empty-state">No pending plans for today</p>
+                <p class="empty-state">No sessions scheduled for today</p>
               </div>
             </div>
             <div class="card">
@@ -239,40 +232,73 @@
           </div>
         </section>
 
-        <!-- Study Plan View -->
-        <section id="study-plan-view" class="view">
+        <!-- Study Weekly Plan View -->
+        <section id="study-weekly-plan-view" class="view">
           <div class="view-header">
-            <h2>Study Plan</h2>
+            <h2>Study Weekly Plan</h2>
             <div class="view-actions">
-              <button class="btn btn-secondary" id="study-plan-prev-week">&larr; Prev</button>
-              <span id="study-plan-week-display" class="week-display"></span>
-              <button class="btn btn-secondary" id="study-plan-next-week">Next &rarr;</button>
-              <button class="btn btn-primary" id="add-study-plan-btn">+ Add Plan</button>
+              <button class="btn btn-primary" id="add-study-weekly-plan-btn">+ Add to Plan</button>
             </div>
           </div>
-          <div class="week-grid" id="study-plan-grid">
-            <!-- Days will be rendered here -->
+          <div class="weekly-plan-grid" id="study-weekly-plan-grid">
+            <!-- 7 day columns rendered by JS -->
+          </div>
+          <div class="weekly-progress" id="study-weekly-progress">
+            <h3>This Week's Progress</h3>
+            <div class="progress-bar-container">
+              <div class="progress-bar" id="study-progress-bar"></div>
+            </div>
+            <span id="study-progress-text" class="progress-text">0 of 0 completed</span>
+          </div>
+          <div class="card" style="margin-top: 2rem;">
+            <div class="card-header">
+              <h3>Activity Log</h3>
+              <div class="view-actions">
+                <select id="study-embedded-log-filter" class="form-select">
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="all">All Time</option>
+                </select>
+                <button class="btn btn-primary btn-sm" id="add-study-log-inline-btn">+ Add Log</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="log-list log-list-compact" id="study-embedded-log-list">
+                <p class="empty-state">No study logs yet</p>
+              </div>
+            </div>
           </div>
         </section>
 
-        <!-- Study Log View -->
-        <section id="study-log-view" class="view">
+        <!-- Study Stats View -->
+        <section id="study-stats-view" class="view">
           <div class="view-header">
-            <h2>Study Log</h2>
+            <h2>Study Stats</h2>
             <div class="view-actions">
-              <select id="study-log-filter" class="form-select">
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="all">All Time</option>
-              </select>
-              <select id="study-log-category-filter" class="form-select">
-                <option value="">All Categories</option>
-              </select>
-              <button class="btn btn-primary" id="add-study-log-btn">+ Add Log</button>
+              <div class="btn-group">
+                <button class="btn btn-secondary active" data-stats-period="weekly" data-stats-area="study">Weekly</button>
+                <button class="btn btn-secondary" data-stats-period="monthly" data-stats-area="study">Monthly</button>
+              </div>
+              <button class="btn btn-ghost" id="study-stats-prev">&larr;</button>
+              <span id="study-stats-period-display" class="week-display"></span>
+              <button class="btn btn-ghost" id="study-stats-next">&rarr;</button>
             </div>
           </div>
-          <div class="log-list" id="study-log-list">
-            <p class="empty-state">No study logs yet</p>
+          <div class="analytics-card">
+            <h3>Study</h3>
+            <div class="analytics-total">
+              <span id="study-stats-time">0h 0m</span>
+              <span class="analytics-sessions">(<span id="study-stats-sessions">0</span> sessions)</span>
+            </div>
+            <div class="analytics-breakdown" id="study-stats-breakdown">
+            </div>
+          </div>
+          <div class="card" style="margin-top: 1.5rem;">
+            <div class="card-header"><h3>Daily Breakdown</h3></div>
+            <div class="card-body">
+              <div class="chart-container" id="study-daily-chart">
+              </div>
+            </div>
           </div>
         </section>
 
@@ -344,88 +370,71 @@
           </div>
         </section>
 
-        <!-- Football Plan View -->
-        <section id="football-plan-view" class="view">
+        <!-- Football Weekly Plan View -->
+        <section id="football-weekly-plan-view" class="view">
           <div class="view-header">
-            <h2>Football Plan</h2>
+            <h2>Football Weekly Training Plan</h2>
             <div class="view-actions">
-              <button class="btn btn-secondary" id="football-plan-prev-week">&larr; Prev</button>
-              <span id="football-plan-week-display" class="week-display"></span>
-              <button class="btn btn-secondary" id="football-plan-next-week">Next &rarr;</button>
-              <button class="btn btn-primary" id="add-football-plan-btn">+ Add Plan</button>
+              <button class="btn btn-primary" id="add-football-weekly-plan-btn">+ Add to Plan</button>
             </div>
           </div>
-          <div class="week-grid" id="football-plan-grid">
-            <!-- Days will be rendered here -->
+          <div class="weekly-plan-grid" id="football-weekly-plan-grid">
+            <!-- 7 day columns rendered by JS -->
           </div>
-        </section>
-
-        <!-- Football Log View -->
-        <section id="football-log-view" class="view">
-          <div class="view-header">
-            <h2>Football Log</h2>
-            <div class="view-actions">
-              <select id="football-log-filter" class="form-select">
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="all">All Time</option>
-              </select>
-              <select id="football-log-category-filter" class="form-select">
-                <option value="">All Categories</option>
-              </select>
-              <button class="btn btn-primary" id="add-football-log-btn">+ Add Log</button>
+          <div class="weekly-progress" id="football-weekly-progress">
+            <h3>This Week's Progress</h3>
+            <div class="progress-bar-container">
+              <div class="progress-bar" id="football-progress-bar"></div>
             </div>
+            <span id="football-progress-text" class="progress-text">0 of 0 completed</span>
           </div>
-          <div class="log-list" id="football-log-list">
-            <p class="empty-state">No football logs yet</p>
-          </div>
-        </section>
-
-        <!-- Analytics View -->
-        <section id="analytics-view" class="view">
-          <div class="view-header">
-            <h2>Analytics</h2>
-            <div class="view-actions">
-              <div class="btn-group">
-                <button class="btn btn-secondary active" data-period="weekly">Weekly</button>
-                <button class="btn btn-secondary" data-period="monthly">Monthly</button>
-              </div>
-              <button class="btn btn-ghost" id="analytics-prev">&larr;</button>
-              <span id="analytics-period-display" class="week-display"></span>
-              <button class="btn btn-ghost" id="analytics-next">&rarr;</button>
-            </div>
-          </div>
-
-          <div class="analytics-grid">
-            <div class="analytics-card">
-              <h3>Study</h3>
-              <div class="analytics-total">
-                <span id="analytics-study-time">0h 0m</span>
-                <span class="analytics-sessions">(<span id="analytics-study-sessions">0</span> sessions)</span>
-              </div>
-              <div class="analytics-breakdown" id="analytics-study-breakdown">
-                <!-- Category breakdown -->
-              </div>
-            </div>
-            <div class="analytics-card">
-              <h3>Football</h3>
-              <div class="analytics-total">
-                <span id="analytics-football-time">0h 0m</span>
-                <span class="analytics-sessions">(<span id="analytics-football-sessions">0</span> sessions)</span>
-              </div>
-              <div class="analytics-breakdown" id="analytics-football-breakdown">
-                <!-- Category breakdown -->
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
+          <div class="card" style="margin-top: 2rem;">
             <div class="card-header">
-              <h3>Daily Breakdown</h3>
+              <h3>Activity Log</h3>
+              <div class="view-actions">
+                <select id="football-embedded-log-filter" class="form-select">
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="all">All Time</option>
+                </select>
+                <button class="btn btn-primary btn-sm" id="add-football-log-inline-btn">+ Add Log</button>
+              </div>
             </div>
             <div class="card-body">
-              <div class="chart-container" id="daily-chart">
-                <!-- Simple bar chart -->
+              <div class="log-list log-list-compact" id="football-embedded-log-list">
+                <p class="empty-state">No football logs yet</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Football Stats View -->
+        <section id="football-stats-view" class="view">
+          <div class="view-header">
+            <h2>Football Stats</h2>
+            <div class="view-actions">
+              <div class="btn-group">
+                <button class="btn btn-secondary active" data-stats-period="weekly" data-stats-area="football">Weekly</button>
+                <button class="btn btn-secondary" data-stats-period="monthly" data-stats-area="football">Monthly</button>
+              </div>
+              <button class="btn btn-ghost" id="football-stats-prev">&larr;</button>
+              <span id="football-stats-period-display" class="week-display"></span>
+              <button class="btn btn-ghost" id="football-stats-next">&rarr;</button>
+            </div>
+          </div>
+          <div class="analytics-card">
+            <h3>Football</h3>
+            <div class="analytics-total">
+              <span id="football-stats-time">0h 0m</span>
+              <span class="analytics-sessions">(<span id="football-stats-sessions">0</span> sessions)</span>
+            </div>
+            <div class="analytics-breakdown" id="football-stats-breakdown">
+            </div>
+          </div>
+          <div class="card" style="margin-top: 1.5rem;">
+            <div class="card-header"><h3>Daily Breakdown</h3></div>
+            <div class="card-body">
+              <div class="chart-container" id="football-daily-chart">
               </div>
             </div>
           </div>

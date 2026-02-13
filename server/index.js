@@ -8,6 +8,7 @@ import categoriesRoutes from './routes/categories.js';
 import plansRoutes from './routes/plans.js';
 import logsRoutes from './routes/logs.js';
 import analyticsRoutes from './routes/analytics.js';
+import weeklyPlansRoutes from './routes/weekly-plans.js';
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ app.use(express.static(join(__dirname, '..')));
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/plans', plansRoutes);
+app.use('/api/weekly-plans', weeklyPlansRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 

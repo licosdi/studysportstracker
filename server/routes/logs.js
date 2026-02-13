@@ -15,7 +15,8 @@ router.get('/', (req, res) => {
     let query = `
       SELECT
         l.id, l.area, l.date_time as dateTime, l.category_id as categoryId,
-        l.plan_item_id as planItemId, l.title, l.notes, l.duration_minutes as durationMinutes,
+        l.plan_item_id as planItemId, l.weekly_plan_item_id as weeklyPlanItemId,
+        l.title, l.notes, l.duration_minutes as durationMinutes,
         l.intensity, l.points, l.created_at as createdAt,
         CASE
           WHEN l.area = 'study' THEN sc.name
@@ -100,7 +101,8 @@ router.get('/today', (req, res) => {
     let query = `
       SELECT
         l.id, l.area, l.date_time as dateTime, l.category_id as categoryId,
-        l.plan_item_id as planItemId, l.title, l.notes, l.duration_minutes as durationMinutes,
+        l.plan_item_id as planItemId, l.weekly_plan_item_id as weeklyPlanItemId,
+        l.title, l.notes, l.duration_minutes as durationMinutes,
         l.intensity, l.points, l.created_at as createdAt,
         CASE
           WHEN l.area = 'study' THEN sc.name
@@ -157,7 +159,8 @@ router.post('/', (req, res) => {
     const entry = db.prepare(`
       SELECT
         l.id, l.area, l.date_time as dateTime, l.category_id as categoryId,
-        l.plan_item_id as planItemId, l.title, l.notes, l.duration_minutes as durationMinutes,
+        l.plan_item_id as planItemId, l.weekly_plan_item_id as weeklyPlanItemId,
+        l.title, l.notes, l.duration_minutes as durationMinutes,
         l.intensity, l.points, l.created_at as createdAt,
         CASE
           WHEN l.area = 'study' THEN sc.name
@@ -209,7 +212,8 @@ router.put('/:id', (req, res) => {
     const entry = db.prepare(`
       SELECT
         l.id, l.area, l.date_time as dateTime, l.category_id as categoryId,
-        l.plan_item_id as planItemId, l.title, l.notes, l.duration_minutes as durationMinutes,
+        l.plan_item_id as planItemId, l.weekly_plan_item_id as weeklyPlanItemId,
+        l.title, l.notes, l.duration_minutes as durationMinutes,
         l.intensity, l.points, l.created_at as createdAt,
         CASE
           WHEN l.area = 'study' THEN sc.name

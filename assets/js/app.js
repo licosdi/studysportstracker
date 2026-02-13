@@ -5,10 +5,12 @@ class LogbookApp {
     this.currentView = 'dashboard';
     this.studyCategories = [];
     this.footballCategories = [];
-    this.studyPlanWeekStart = this.getWeekStart(new Date());
-    this.footballPlanWeekStart = this.getWeekStart(new Date());
-    this.analyticsMode = 'weekly';
-    this.analyticsDate = new Date();
+
+    // Per-area stats state
+    this.studyStatsMode = 'weekly';
+    this.studyStatsDate = new Date();
+    this.footballStatsMode = 'weekly';
+    this.footballStatsDate = new Date();
 
     // Timer state
     this.timers = {
@@ -187,20 +189,19 @@ class LogbookApp {
       document.getElementById('week-football-time').textContent = this.formatDuration(data.week.football.minutes);
       document.getElementById('week-football-sessions').textContent = data.week.football.sessions;
 
-      // Pending plans
+      // Today's schedule from weekly plan
       const pendingPlansEl = document.getElementById('pending-plans-list');
-      if (data.today.pendingPlans > 0) {
-        const plans = await api.getPlans({ startDate: data.today.date, endDate: data.today.date });
-        const pending = plans.items.filter(p => p.status === 'planned');
-        pendingPlansEl.innerHTML = pending.map(p => `
-          <div class="list-item">
-            <span class="category-badge" style="background: ${p.categoryColor}">${p.categoryName}</span>
-            <span class="list-item-title">${p.title}</span>
-            <span class="list-item-meta">${p.durationMinutes}m</span>
+      if (data.today.schedule && data.today.schedule.length > 0) {
+        pendingPlansEl.innerHTML = data.today.schedule.map(s => `
+          <div class="list-item ${s.isCompleted ? 'completed' : ''}">
+            <span class="category-badge" style="background: ${s.categoryColor}">${s.categoryName}</span>
+            <span class="list-item-title" style="${s.isCompleted ? 'text-decoration: line-through; opacity: 0.6' : ''}">${s.title}</span>
+            <span class="list-item-meta">${s.durationMinutes}m</span>
+            ${s.isCompleted ? '<span class="from-plan-badge">done</span>' : ''}
           </div>
         `).join('');
       } else {
-        pendingPlansEl.innerHTML = '<p class="empty-state">No pending plans for today</p>';
+        pendingPlansEl.innerHTML = '<p class="empty-state">No sessions scheduled for today</p>';
       }
 
       // Recent logs
@@ -247,32 +248,31 @@ class LogbookApp {
       });
     });
 
-    // Study Plan
-    document.getElementById('study-plan-prev-week').addEventListener('click', () => this.changeStudyPlanWeek(-1));
-    document.getElementById('study-plan-next-week').addEventListener('click', () => this.changeStudyPlanWeek(1));
-    document.getElementById('add-study-plan-btn').addEventListener('click', () => this.openPlanModal('study'));
+    // Weekly Plan buttons
+    document.getElementById('add-study-weekly-plan-btn').addEventListener('click', () => this.openWeeklyPlanModal('study'));
+    document.getElementById('add-football-weekly-plan-btn').addEventListener('click', () => this.openWeeklyPlanModal('football'));
 
-    // Football Plan
-    document.getElementById('football-plan-prev-week').addEventListener('click', () => this.changeFootballPlanWeek(-1));
-    document.getElementById('football-plan-next-week').addEventListener('click', () => this.changeFootballPlanWeek(1));
-    document.getElementById('add-football-plan-btn').addEventListener('click', () => this.openPlanModal('football'));
+    // Inline log buttons
+    document.getElementById('add-study-log-inline-btn').addEventListener('click', () => this.openLogModal('study'));
+    document.getElementById('add-football-log-inline-btn').addEventListener('click', () => this.openLogModal('football'));
 
-    // Log buttons
-    document.getElementById('add-study-log-btn').addEventListener('click', () => this.openLogModal('study'));
-    document.getElementById('add-football-log-btn').addEventListener('click', () => this.openLogModal('football'));
+    // Embedded log filters
+    document.getElementById('study-embedded-log-filter').addEventListener('change', () => this.loadStudyEmbeddedLogs());
+    document.getElementById('football-embedded-log-filter').addEventListener('change', () => this.loadFootballEmbeddedLogs());
 
-    // Log filters
-    document.getElementById('study-log-filter').addEventListener('change', () => this.loadStudyLogs());
-    document.getElementById('study-log-category-filter').addEventListener('change', () => this.loadStudyLogs());
-    document.getElementById('football-log-filter').addEventListener('change', () => this.loadFootballLogs());
-    document.getElementById('football-log-category-filter').addEventListener('change', () => this.loadFootballLogs());
-
-    // Analytics
-    document.querySelectorAll('[data-period]').forEach(btn => {
-      btn.addEventListener('click', () => this.setAnalyticsPeriod(btn.dataset.period));
+    // Study stats
+    document.querySelectorAll('[data-stats-area="study"]').forEach(btn => {
+      btn.addEventListener('click', () => this.setStudyStatsPeriod(btn.dataset.statsPeriod));
     });
-    document.getElementById('analytics-prev').addEventListener('click', () => this.changeAnalyticsPeriod(-1));
-    document.getElementById('analytics-next').addEventListener('click', () => this.changeAnalyticsPeriod(1));
+    document.getElementById('study-stats-prev').addEventListener('click', () => this.changeStudyStatsPeriod(-1));
+    document.getElementById('study-stats-next').addEventListener('click', () => this.changeStudyStatsPeriod(1));
+
+    // Football stats
+    document.querySelectorAll('[data-stats-area="football"]').forEach(btn => {
+      btn.addEventListener('click', () => this.setFootballStatsPeriod(btn.dataset.statsPeriod));
+    });
+    document.getElementById('football-stats-prev').addEventListener('click', () => this.changeFootballStatsPeriod(-1));
+    document.getElementById('football-stats-next').addEventListener('click', () => this.changeFootballStatsPeriod(1));
 
     // Settings tabs
     document.querySelectorAll('.settings-tab').forEach(tab => {
@@ -327,12 +327,11 @@ class LogbookApp {
     switch (view) {
       case 'dashboard': this.loadDashboard(); break;
       case 'study-timer': this.loadStudyTimer(); break;
-      case 'study-plan': this.loadStudyPlan(); break;
-      case 'study-log': this.loadStudyLogs(); break;
+      case 'study-weekly-plan': this.loadStudyWeeklyPlan(); break;
+      case 'study-stats': this.loadStudyStats(); break;
       case 'football-timer': this.loadFootballTimer(); break;
-      case 'football-plan': this.loadFootballPlan(); break;
-      case 'football-log': this.loadFootballLogs(); break;
-      case 'analytics': this.loadAnalytics(); break;
+      case 'football-weekly-plan': this.loadFootballWeeklyPlan(); break;
+      case 'football-stats': this.loadFootballStats(); break;
       case 'settings': this.loadSettings(); break;
     }
   }
@@ -393,7 +392,7 @@ class LogbookApp {
     if (!progress) return;
 
     const totalSeconds = timer.duration * 60;
-    const circumference = 2 * Math.PI * 45; // r=45 from SVG
+    const circumference = 2 * Math.PI * 45;
     const offset = circumference * (1 - timer.remaining / totalSeconds);
     progress.style.strokeDashoffset = offset;
   }
@@ -421,7 +420,6 @@ class LogbookApp {
     timer.isRunning = true;
     timer.isPaused = false;
 
-    // Get category name for label
     const categories = area === 'study' ? this.studyCategories : this.footballCategories;
     const category = categories.find(c => c.id === timer.categoryId);
     const label = document.getElementById(`${area}-timer-label`);
@@ -429,13 +427,11 @@ class LogbookApp {
       label.textContent = `Working: ${category.name}`;
     }
 
-    // Disable controls
     document.getElementById(`${area}-start-btn`).disabled = true;
     document.getElementById(`${area}-pause-btn`).disabled = false;
     document.getElementById(`${area}-timer-category`).disabled = true;
     document.getElementById(`${area}-timer-duration`).disabled = true;
 
-    // Start interval
     timer.interval = setInterval(() => {
       if (timer.isBreak) {
         timer.breakRemaining--;
@@ -459,12 +455,10 @@ class LogbookApp {
     const pauseBtn = document.getElementById(`${area}-pause-btn`);
 
     if (timer.isPaused) {
-      // Resume
       timer.isPaused = false;
       pauseBtn.textContent = 'Pause';
       this.startTimer(area);
     } else {
-      // Pause
       timer.isPaused = true;
       pauseBtn.textContent = 'Resume';
       clearInterval(timer.interval);
@@ -481,17 +475,14 @@ class LogbookApp {
     timer.remaining = timer.duration * 60;
     timer.breakRemaining = 5 * 60;
 
-    // Re-enable controls
     document.getElementById(`${area}-start-btn`).disabled = false;
     document.getElementById(`${area}-pause-btn`).disabled = true;
     document.getElementById(`${area}-pause-btn`).textContent = 'Pause';
     document.getElementById(`${area}-timer-category`).disabled = false;
     document.getElementById(`${area}-timer-duration`).disabled = false;
 
-    // Hide break section
     document.getElementById(`${area}-break-section`).style.display = 'none';
 
-    // Update displays
     const label = document.getElementById(`${area}-timer-label`);
     if (label) label.textContent = 'Ready to start';
 
@@ -504,12 +495,10 @@ class LogbookApp {
     const timer = this.timers[area];
     clearInterval(timer.interval);
 
-    // Get category info
     const categories = area === 'study' ? this.studyCategories : this.footballCategories;
     const category = categories.find(c => c.id === timer.categoryId);
 
     try {
-      // Log the session
       const logData = {
         area,
         dateTime: new Date().toISOString(),
@@ -527,7 +516,6 @@ class LogbookApp {
 
       alert(`Great job! You completed ${timer.duration} minutes of ${category?.name || area}!`);
 
-      // Show break section
       timer.isBreak = true;
       document.getElementById(`${area}-break-section`).style.display = 'block';
       document.getElementById(`${area}-start-btn`).disabled = true;
@@ -562,171 +550,152 @@ class LogbookApp {
   completeBreak(area) {
     const timer = this.timers[area];
     clearInterval(timer.interval);
-
-    // Reset for next session
     this.resetTimer(area);
     alert('Break complete! Ready for the next session.');
   }
 
-  // ==================== STUDY PLAN ====================
+  // ==================== WEEKLY PLAN ====================
 
-  async loadStudyPlan() {
-    const weekStart = this.formatDate(this.studyPlanWeekStart);
-    document.getElementById('study-plan-week-display').textContent = this.formatWeekDisplay(this.studyPlanWeekStart);
-
+  async loadStudyWeeklyPlan() {
+    const weekStart = this.formatDate(this.getWeekStart(new Date()));
     try {
-      const { items } = await api.getWeekPlans(weekStart, 'study');
-      this.renderWeekGrid('study-plan-grid', this.studyPlanWeekStart, items);
+      const { items } = await api.getWeeklyPlanStatus(weekStart, 'study');
+      this.renderWeeklyPlanGrid('study-weekly-plan-grid', items, 'study');
+      this.updateWeeklyProgress(items, 'study');
+      this.loadStudyEmbeddedLogs();
     } catch (error) {
-      console.error('Failed to load study plan:', error);
+      console.error('Failed to load study weekly plan:', error);
     }
   }
 
-  changeStudyPlanWeek(delta) {
-    this.studyPlanWeekStart.setDate(this.studyPlanWeekStart.getDate() + (delta * 7));
-    this.loadStudyPlan();
-  }
-
-  // ==================== FOOTBALL PLAN ====================
-
-  async loadFootballPlan() {
-    const weekStart = this.formatDate(this.footballPlanWeekStart);
-    document.getElementById('football-plan-week-display').textContent = this.formatWeekDisplay(this.footballPlanWeekStart);
-
+  async loadFootballWeeklyPlan() {
+    const weekStart = this.formatDate(this.getWeekStart(new Date()));
     try {
-      const { items } = await api.getWeekPlans(weekStart, 'football');
-      this.renderWeekGrid('football-plan-grid', this.footballPlanWeekStart, items);
+      const { items } = await api.getWeeklyPlanStatus(weekStart, 'football');
+      this.renderWeeklyPlanGrid('football-weekly-plan-grid', items, 'football');
+      this.updateWeeklyProgress(items, 'football');
+      this.loadFootballEmbeddedLogs();
     } catch (error) {
-      console.error('Failed to load football plan:', error);
+      console.error('Failed to load football weekly plan:', error);
     }
   }
 
-  changeFootballPlanWeek(delta) {
-    this.footballPlanWeekStart.setDate(this.footballPlanWeekStart.getDate() + (delta * 7));
-    this.loadFootballPlan();
-  }
-
-  // ==================== WEEK GRID ====================
-
-  renderWeekGrid(containerId, weekStart, items) {
+  renderWeeklyPlanGrid(containerId, items, area) {
     const container = document.getElementById(containerId);
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const area = containerId.includes('study') ? 'study' : 'football';
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const todayIndex = (new Date().getDay() + 6) % 7; // Monday=0
 
     let html = '';
     for (let i = 0; i < 7; i++) {
-      const date = new Date(weekStart);
-      date.setDate(date.getDate() + i);
-      const dateStr = this.formatDate(date);
-      const dayItems = items.filter(item => item.date === dateStr);
-      const isToday = dateStr === this.formatDate(new Date());
+      const dayItems = items.filter(item => item.dayOfWeek === i);
+      const isToday = i === todayIndex;
 
       html += `
         <div class="day-column ${isToday ? 'today' : ''}">
           <div class="day-header">
             <span class="day-name">${days[i]}</span>
-            <span class="day-date">${date.getDate()}</span>
           </div>
           <div class="day-items">
-            ${dayItems.map(item => this.renderPlanItem(item)).join('')}
+            ${dayItems.map(item => {
+              const isCompleted = !!item.isCompleted;
+              return `
+                <div class="plan-item ${isCompleted ? 'completed' : ''}" data-id="${item.id}">
+                  <label class="plan-checkbox">
+                    <input type="checkbox" ${isCompleted ? 'checked' : ''} data-weekly-id="${item.id}">
+                  </label>
+                  <div class="plan-content">
+                    <span class="category-badge" style="background: ${item.categoryColor}">${item.categoryName}</span>
+                    <div class="plan-item-title">${item.title}</div>
+                    <div class="plan-item-meta">${item.durationMinutes}m${item.intensity ? ' &middot; ' + item.intensity : ''}</div>
+                  </div>
+                  <div class="plan-item-actions">
+                    <button class="delete-btn" data-weekly-id="${item.id}" title="Remove">&#128465;</button>
+                  </div>
+                </div>
+              `;
+            }).join('') || ''}
           </div>
-          <button class="add-day-item-btn" data-date="${dateStr}" data-area="${area}">+ Add</button>
+          <button class="add-day-item-btn" data-day="${i}" data-area="${area}">+ Add</button>
         </div>
       `;
     }
     container.innerHTML = html;
 
-    // Add event listeners
+    // Checkbox listeners
+    container.querySelectorAll('input[type="checkbox"][data-weekly-id]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const id = cb.dataset.weeklyId;
+        if (cb.checked) this.completeWeeklyPlan(id, area);
+        else this.uncompleteWeeklyPlan(id, area);
+      });
+    });
+
+    // Delete listeners
+    container.querySelectorAll('.delete-btn[data-weekly-id]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.deleteWeeklyPlan(btn.dataset.weeklyId, area);
+      });
+    });
+
+    // Add per-day listeners
     container.querySelectorAll('.add-day-item-btn').forEach(btn => {
-      btn.addEventListener('click', () => this.openPlanModal(btn.dataset.area, btn.dataset.date));
-    });
-
-    container.querySelectorAll('.plan-item').forEach(el => {
-      const id = el.dataset.id;
-      el.querySelector('.complete-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.completePlan(id, area);
-      });
-      el.querySelector('.skip-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.skipPlan(id, area);
-      });
-      el.querySelector('.delete-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.deletePlan(id, area);
+      btn.addEventListener('click', () => {
+        this.openWeeklyPlanModal(btn.dataset.area, parseInt(btn.dataset.day));
       });
     });
   }
 
-  renderPlanItem(item) {
-    const statusClass = item.status === 'completed' ? 'completed' : item.status === 'skipped' ? 'skipped' : '';
-    return `
-      <div class="plan-item ${statusClass}" data-id="${item.id}">
-        <div class="plan-item-header">
-          <span class="category-badge" style="background: ${item.categoryColor}">${item.categoryName}</span>
-          ${item.intensity ? `<span class="intensity-badge ${item.intensity}">${item.intensity}</span>` : ''}
-        </div>
-        <div class="plan-item-title">${item.title}</div>
-        <div class="plan-item-meta">${item.durationMinutes}m</div>
-        ${item.status === 'planned' ? `
-          <div class="plan-item-actions">
-            <button class="complete-btn" title="Complete">&#10003;</button>
-            <button class="skip-btn" title="Skip">&#10005;</button>
-            <button class="delete-btn" title="Delete">&#128465;</button>
-          </div>
-        ` : ''}
-      </div>
-    `;
+  updateWeeklyProgress(items, area) {
+    const total = items.length;
+    const completed = items.filter(item => item.isCompleted).length;
+    const progressText = document.getElementById(`${area}-progress-text`);
+    const progressBar = document.getElementById(`${area}-progress-bar`);
+    if (progressText) progressText.textContent = `${completed} of ${total} completed`;
+    if (progressBar) progressBar.style.width = total > 0 ? `${(completed / total * 100)}%` : '0%';
   }
 
-  async completePlan(id, area) {
+  async completeWeeklyPlan(id, area) {
     try {
-      await api.completePlan(id);
-      if (area === 'study') this.loadStudyPlan();
-      else this.loadFootballPlan();
+      await api.completeWeeklyPlan(id);
+      if (area === 'study') this.loadStudyWeeklyPlan();
+      else this.loadFootballWeeklyPlan();
+    } catch (error) {
+      alert(error.message);
+      // Reload to reset checkbox state
+      if (area === 'study') this.loadStudyWeeklyPlan();
+      else this.loadFootballWeeklyPlan();
+    }
+  }
+
+  async uncompleteWeeklyPlan(id, area) {
+    try {
+      await api.uncompleteWeeklyPlan(id);
+      if (area === 'study') this.loadStudyWeeklyPlan();
+      else this.loadFootballWeeklyPlan();
+    } catch (error) {
+      alert(error.message);
+      if (area === 'study') this.loadStudyWeeklyPlan();
+      else this.loadFootballWeeklyPlan();
+    }
+  }
+
+  async deleteWeeklyPlan(id, area) {
+    if (!confirm('Remove this item from your weekly plan?')) return;
+    try {
+      await api.deleteWeeklyPlan(id);
+      if (area === 'study') this.loadStudyWeeklyPlan();
+      else this.loadFootballWeeklyPlan();
     } catch (error) {
       alert(error.message);
     }
   }
 
-  async skipPlan(id, area) {
-    try {
-      await api.skipPlan(id);
-      if (area === 'study') this.loadStudyPlan();
-      else this.loadFootballPlan();
-    } catch (error) {
-      alert(error.message);
-    }
-  }
+  // ==================== EMBEDDED LOGS ====================
 
-  async deletePlan(id, area) {
-    if (!confirm('Delete this plan item?')) return;
-    try {
-      await api.deletePlan(id);
-      if (area === 'study') this.loadStudyPlan();
-      else this.loadFootballPlan();
-    } catch (error) {
-      alert(error.message);
-    }
-  }
-
-  // ==================== LOGS ====================
-
-  async loadStudyLogs() {
-    const filter = document.getElementById('study-log-filter').value;
-    const categoryId = document.getElementById('study-log-category-filter').value;
-
-    // Populate category filter
-    const catFilter = document.getElementById('study-log-category-filter');
-    const currentVal = catFilter.value;
-    catFilter.innerHTML = '<option value="">All Categories</option>' +
-      this.studyCategories.filter(c => c.isActive).map(c =>
-        `<option value="${c.id}">${c.name}</option>`
-      ).join('');
-    catFilter.value = currentVal;
-
+  async loadStudyEmbeddedLogs() {
+    const filter = document.getElementById('study-embedded-log-filter').value;
     const params = { area: 'study' };
-    if (categoryId) params.categoryId = categoryId;
 
     const today = new Date();
     if (filter === 'week') {
@@ -738,27 +707,15 @@ class LogbookApp {
 
     try {
       const { entries } = await api.getLogs(params);
-      this.renderLogList('study-log-list', entries, 'study');
+      this.renderLogList('study-embedded-log-list', entries, 'study');
     } catch (error) {
       console.error('Failed to load study logs:', error);
     }
   }
 
-  async loadFootballLogs() {
-    const filter = document.getElementById('football-log-filter').value;
-    const categoryId = document.getElementById('football-log-category-filter').value;
-
-    // Populate category filter
-    const catFilter = document.getElementById('football-log-category-filter');
-    const currentVal = catFilter.value;
-    catFilter.innerHTML = '<option value="">All Categories</option>' +
-      this.footballCategories.filter(c => c.isActive).map(c =>
-        `<option value="${c.id}">${c.name}</option>`
-      ).join('');
-    catFilter.value = currentVal;
-
+  async loadFootballEmbeddedLogs() {
+    const filter = document.getElementById('football-embedded-log-filter').value;
     const params = { area: 'football' };
-    if (categoryId) params.categoryId = categoryId;
 
     const today = new Date();
     if (filter === 'week') {
@@ -770,7 +727,7 @@ class LogbookApp {
 
     try {
       const { entries } = await api.getLogs(params);
-      this.renderLogList('football-log-list', entries, 'football');
+      this.renderLogList('football-embedded-log-list', entries, 'football');
     } catch (error) {
       console.error('Failed to load football logs:', error);
     }
@@ -793,17 +750,17 @@ class LogbookApp {
         <div class="log-item-meta">
           <span class="log-item-duration">${this.formatDuration(entry.durationMinutes)}</span>
           <span class="log-item-date">${this.formatDateTime(entry.dateTime)}</span>
+          ${entry.weeklyPlanItemId ? '<span class="from-plan-badge">from plan</span>' : ''}
           ${entry.planItemId ? '<span class="from-plan-badge">from plan</span>' : ''}
         </div>
         ${entry.notes ? `<div class="log-item-notes">${entry.notes}</div>` : ''}
         <div class="log-item-actions">
-          <button class="edit-btn" data-id="${entry.id}">Edit</button>
           <button class="delete-btn" data-id="${entry.id}">Delete</button>
         </div>
       </div>
     `).join('');
 
-    container.querySelectorAll('.delete-btn').forEach(btn => {
+    container.querySelectorAll('.log-item-actions .delete-btn').forEach(btn => {
       btn.addEventListener('click', () => this.deleteLog(btn.dataset.id, area));
     });
   }
@@ -812,111 +769,96 @@ class LogbookApp {
     if (!confirm('Delete this log entry?')) return;
     try {
       await api.deleteLog(id);
-      if (area === 'study') this.loadStudyLogs();
-      else this.loadFootballLogs();
+      if (area === 'study') this.loadStudyEmbeddedLogs();
+      else this.loadFootballEmbeddedLogs();
     } catch (error) {
       alert(error.message);
     }
   }
 
-  // ==================== ANALYTICS ====================
+  // ==================== STATS ====================
 
-  async loadAnalytics() {
-    if (this.analyticsMode === 'weekly') {
-      await this.loadWeeklyAnalytics();
+  async loadStudyStats() {
+    if (this.studyStatsMode === 'weekly') {
+      const weekStart = this.getWeekStart(this.studyStatsDate);
+      document.getElementById('study-stats-period-display').textContent = this.formatWeekDisplay(weekStart);
+      try {
+        const data = await api.getWeeklyStats(this.formatDate(weekStart), 'study');
+        this.renderAreaStats('study', data);
+      } catch (error) {
+        console.error('Failed to load study stats:', error);
+      }
     } else {
-      await this.loadMonthlyAnalytics();
+      const year = this.studyStatsDate.getFullYear();
+      const month = this.studyStatsDate.getMonth() + 1;
+      document.getElementById('study-stats-period-display').textContent =
+        this.studyStatsDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      try {
+        const data = await api.getMonthlyStats(year, month, 'study');
+        this.renderAreaStats('study', data);
+      } catch (error) {
+        console.error('Failed to load study stats:', error);
+      }
     }
   }
 
-  setAnalyticsPeriod(mode) {
-    this.analyticsMode = mode;
-    document.querySelectorAll('[data-period]').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.period === mode);
-    });
-    this.loadAnalytics();
-  }
-
-  changeAnalyticsPeriod(delta) {
-    if (this.analyticsMode === 'weekly') {
-      this.analyticsDate.setDate(this.analyticsDate.getDate() + (delta * 7));
+  async loadFootballStats() {
+    if (this.footballStatsMode === 'weekly') {
+      const weekStart = this.getWeekStart(this.footballStatsDate);
+      document.getElementById('football-stats-period-display').textContent = this.formatWeekDisplay(weekStart);
+      try {
+        const data = await api.getWeeklyStats(this.formatDate(weekStart), 'football');
+        this.renderAreaStats('football', data);
+      } catch (error) {
+        console.error('Failed to load football stats:', error);
+      }
     } else {
-      this.analyticsDate.setMonth(this.analyticsDate.getMonth() + delta);
-    }
-    this.loadAnalytics();
-  }
-
-  async loadWeeklyAnalytics() {
-    const weekStart = this.getWeekStart(this.analyticsDate);
-    document.getElementById('analytics-period-display').textContent = this.formatWeekDisplay(weekStart);
-
-    try {
-      const data = await api.getWeeklyStats(this.formatDate(weekStart));
-      this.renderAnalyticsData(data);
-    } catch (error) {
-      console.error('Failed to load weekly analytics:', error);
+      const year = this.footballStatsDate.getFullYear();
+      const month = this.footballStatsDate.getMonth() + 1;
+      document.getElementById('football-stats-period-display').textContent =
+        this.footballStatsDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      try {
+        const data = await api.getMonthlyStats(year, month, 'football');
+        this.renderAreaStats('football', data);
+      } catch (error) {
+        console.error('Failed to load football stats:', error);
+      }
     }
   }
 
-  async loadMonthlyAnalytics() {
-    const year = this.analyticsDate.getFullYear();
-    const month = this.analyticsDate.getMonth() + 1;
-    document.getElementById('analytics-period-display').textContent =
-      this.analyticsDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  renderAreaStats(area, data) {
+    const areaData = data[area] || { totalMinutes: 0, totalSessions: 0, breakdown: [] };
+    document.getElementById(`${area}-stats-time`).textContent = this.formatDuration(areaData.totalMinutes);
+    document.getElementById(`${area}-stats-sessions`).textContent = areaData.totalSessions;
 
-    try {
-      const data = await api.getMonthlyStats(year, month);
-      this.renderAnalyticsData(data);
-    } catch (error) {
-      console.error('Failed to load monthly analytics:', error);
+    const breakdownEl = document.getElementById(`${area}-stats-breakdown`);
+    if (areaData.breakdown.length > 0) {
+      breakdownEl.innerHTML = areaData.breakdown.map(cat => `
+        <div class="breakdown-item">
+          <div class="breakdown-label">
+            <span class="breakdown-color" style="background: ${cat.categoryColor}"></span>
+            ${cat.categoryName}
+          </div>
+          <div class="breakdown-value">${this.formatDuration(cat.totalMinutes)}</div>
+          <div class="breakdown-bar">
+            <div class="breakdown-bar-fill" style="width: ${(cat.totalMinutes / areaData.totalMinutes * 100) || 0}%; background: ${cat.categoryColor}"></div>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      breakdownEl.innerHTML = '<p class="empty-state">No data</p>';
     }
-  }
-
-  renderAnalyticsData(data) {
-    document.getElementById('analytics-study-time').textContent = this.formatDuration(data.study.totalMinutes);
-    document.getElementById('analytics-study-sessions').textContent = data.study.totalSessions;
-    document.getElementById('analytics-football-time').textContent = this.formatDuration(data.football.totalMinutes);
-    document.getElementById('analytics-football-sessions').textContent = data.football.totalSessions;
-
-    // Study breakdown
-    const studyBreakdown = document.getElementById('analytics-study-breakdown');
-    studyBreakdown.innerHTML = data.study.breakdown.map(cat => `
-      <div class="breakdown-item">
-        <div class="breakdown-label">
-          <span class="breakdown-color" style="background: ${cat.categoryColor}"></span>
-          ${cat.categoryName}
-        </div>
-        <div class="breakdown-value">${this.formatDuration(cat.totalMinutes)}</div>
-        <div class="breakdown-bar">
-          <div class="breakdown-bar-fill" style="width: ${(cat.totalMinutes / data.study.totalMinutes * 100) || 0}%; background: ${cat.categoryColor}"></div>
-        </div>
-      </div>
-    `).join('') || '<p class="empty-state">No data</p>';
-
-    // Football breakdown
-    const footballBreakdown = document.getElementById('analytics-football-breakdown');
-    footballBreakdown.innerHTML = data.football.breakdown.map(cat => `
-      <div class="breakdown-item">
-        <div class="breakdown-label">
-          <span class="breakdown-color" style="background: ${cat.categoryColor}"></span>
-          ${cat.categoryName}
-        </div>
-        <div class="breakdown-value">${this.formatDuration(cat.totalMinutes)}</div>
-        <div class="breakdown-bar">
-          <div class="breakdown-bar-fill" style="width: ${(cat.totalMinutes / data.football.totalMinutes * 100) || 0}%; background: ${cat.categoryColor}"></div>
-        </div>
-      </div>
-    `).join('') || '<p class="empty-state">No data</p>';
 
     // Daily chart
-    const chartContainer = document.getElementById('daily-chart');
-    if (data.daily && data.daily.length > 0) {
-      const maxMinutes = Math.max(...data.daily.map(d => d.totalMinutes), 60);
+    const chartContainer = document.getElementById(`${area}-daily-chart`);
+    const dailyData = data.daily ? data.daily.filter(d => d.area === area) : [];
+    if (dailyData.length > 0) {
+      const maxMinutes = Math.max(...dailyData.map(d => d.totalMinutes), 60);
       chartContainer.innerHTML = `
         <div class="bar-chart">
-          ${data.daily.map(d => `
+          ${dailyData.map(d => `
             <div class="bar-group">
-              <div class="bar" style="height: ${(d.totalMinutes / maxMinutes * 100)}%; background: ${d.area === 'study' ? '#6366f1' : '#10b981'}"></div>
+              <div class="bar" style="height: ${(d.totalMinutes / maxMinutes * 100)}%; background: ${area === 'study' ? '#6366f1' : '#10b981'}"></div>
               <div class="bar-label">${new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' })}</div>
             </div>
           `).join('')}
@@ -925,6 +867,40 @@ class LogbookApp {
     } else {
       chartContainer.innerHTML = '<p class="empty-state">No data for this period</p>';
     }
+  }
+
+  setStudyStatsPeriod(mode) {
+    this.studyStatsMode = mode;
+    document.querySelectorAll('[data-stats-area="study"]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.statsPeriod === mode);
+    });
+    this.loadStudyStats();
+  }
+
+  changeStudyStatsPeriod(delta) {
+    if (this.studyStatsMode === 'weekly') {
+      this.studyStatsDate.setDate(this.studyStatsDate.getDate() + (delta * 7));
+    } else {
+      this.studyStatsDate.setMonth(this.studyStatsDate.getMonth() + delta);
+    }
+    this.loadStudyStats();
+  }
+
+  setFootballStatsPeriod(mode) {
+    this.footballStatsMode = mode;
+    document.querySelectorAll('[data-stats-area="football"]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.statsPeriod === mode);
+    });
+    this.loadFootballStats();
+  }
+
+  changeFootballStatsPeriod(delta) {
+    if (this.footballStatsMode === 'weekly') {
+      this.footballStatsDate.setDate(this.footballStatsDate.getDate() + (delta * 7));
+    } else {
+      this.footballStatsDate.setMonth(this.footballStatsDate.getMonth() + delta);
+    }
+    this.loadFootballStats();
   }
 
   // ==================== SETTINGS ====================
@@ -1035,62 +1011,61 @@ class LogbookApp {
     document.getElementById('modal-overlay').style.display = 'none';
   }
 
-  openPlanModal(area, date = null) {
+  openWeeklyPlanModal(area, preselectedDay = null) {
     const categories = area === 'study' ? this.studyCategories.filter(c => c.isActive) : this.footballCategories.filter(c => c.isActive);
-    const defaultDate = date || this.formatDate(new Date());
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const todayIndex = (new Date().getDay() + 6) % 7;
+    const defaultDay = preselectedDay !== null ? preselectedDay : todayIndex;
 
-    this.openModal(`Add ${area === 'study' ? 'Study' : 'Football'} Plan`, `
-      <form id="plan-form">
+    this.openModal(`Add to ${area === 'study' ? 'Study' : 'Football'} Weekly Plan`, `
+      <form id="weekly-plan-form">
         <div class="form-group">
-          <label>Date</label>
-          <input type="date" id="plan-date" value="${defaultDate}" required>
+          <label>Day of Week</label>
+          <select id="weekly-plan-day" class="form-select" required>
+            ${days.map((d, i) => `<option value="${i}" ${i === defaultDay ? 'selected' : ''}>${d}</option>`).join('')}
+          </select>
         </div>
         <div class="form-group">
           <label>Category</label>
-          <select id="plan-category" required>
+          <select id="weekly-plan-category" class="form-select" required>
             ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label>Title</label>
-          <input type="text" id="plan-title" placeholder="What will you do?" required>
+          <input type="text" id="weekly-plan-title" class="form-input" placeholder="What will you do?" required>
         </div>
         <div class="form-group">
           <label>Duration (minutes)</label>
-          <input type="number" id="plan-duration" value="45" min="5" max="480" required>
+          <input type="number" id="weekly-plan-duration" class="form-input" value="45" min="5" max="480" required>
         </div>
         <div class="form-group">
           <label>Intensity</label>
-          <select id="plan-intensity">
+          <select id="weekly-plan-intensity" class="form-select">
             <option value="">None</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Notes (optional)</label>
-          <textarea id="plan-notes" rows="2"></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Add Plan</button>
+        <button type="submit" class="btn btn-primary btn-block">Add to Weekly Plan</button>
       </form>
     `);
 
-    document.getElementById('plan-form').addEventListener('submit', async (e) => {
+    document.getElementById('weekly-plan-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       try {
-        await api.createPlan({
+        await api.createWeeklyPlan({
           area,
-          date: document.getElementById('plan-date').value,
-          categoryId: parseInt(document.getElementById('plan-category').value),
-          title: document.getElementById('plan-title').value,
-          durationMinutes: parseInt(document.getElementById('plan-duration').value),
-          intensity: document.getElementById('plan-intensity').value || null,
-          notes: document.getElementById('plan-notes').value || null
+          dayOfWeek: parseInt(document.getElementById('weekly-plan-day').value),
+          categoryId: parseInt(document.getElementById('weekly-plan-category').value),
+          title: document.getElementById('weekly-plan-title').value,
+          durationMinutes: parseInt(document.getElementById('weekly-plan-duration').value),
+          intensity: document.getElementById('weekly-plan-intensity').value || null
         });
         this.closeModal();
-        if (area === 'study') this.loadStudyPlan();
-        else this.loadFootballPlan();
+        if (area === 'study') this.loadStudyWeeklyPlan();
+        else this.loadFootballWeeklyPlan();
       } catch (error) {
         alert(error.message);
       }
@@ -1106,25 +1081,25 @@ class LogbookApp {
       <form id="log-form">
         <div class="form-group">
           <label>Date & Time</label>
-          <input type="datetime-local" id="log-datetime" value="${dateTimeStr}" required>
+          <input type="datetime-local" id="log-datetime" class="form-input" value="${dateTimeStr}" required>
         </div>
         <div class="form-group">
           <label>Category</label>
-          <select id="log-category" required>
+          <select id="log-category" class="form-select" required>
             ${categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label>Title</label>
-          <input type="text" id="log-title" placeholder="What did you do?" required>
+          <input type="text" id="log-title" class="form-input" placeholder="What did you do?" required>
         </div>
         <div class="form-group">
           <label>Duration (minutes)</label>
-          <input type="number" id="log-duration" value="45" min="1" max="480" required>
+          <input type="number" id="log-duration" class="form-input" value="45" min="1" max="480" required>
         </div>
         <div class="form-group">
           <label>Intensity</label>
-          <select id="log-intensity">
+          <select id="log-intensity" class="form-select">
             <option value="">None</option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
@@ -1133,7 +1108,7 @@ class LogbookApp {
         </div>
         <div class="form-group">
           <label>Notes (optional)</label>
-          <textarea id="log-notes" rows="2"></textarea>
+          <textarea id="log-notes" class="form-input" rows="2"></textarea>
         </div>
         <button type="submit" class="btn btn-primary btn-block">Add Log</button>
       </form>
@@ -1152,8 +1127,8 @@ class LogbookApp {
           notes: document.getElementById('log-notes').value || null
         });
         this.closeModal();
-        if (area === 'study') this.loadStudyLogs();
-        else this.loadFootballLogs();
+        if (area === 'study') this.loadStudyEmbeddedLogs();
+        else this.loadFootballEmbeddedLogs();
       } catch (error) {
         alert(error.message);
       }
@@ -1165,7 +1140,7 @@ class LogbookApp {
       <form id="category-form">
         <div class="form-group">
           <label>Name</label>
-          <input type="text" id="category-name" placeholder="Category name" required>
+          <input type="text" id="category-name" class="form-input" placeholder="Category name" required>
         </div>
         <div class="form-group">
           <label>Color</label>
@@ -1174,7 +1149,7 @@ class LogbookApp {
         ${area === 'football' ? `
           <div class="form-group">
             <label>Type (optional)</label>
-            <select id="category-type">
+            <select id="category-type" class="form-select">
               <option value="">None</option>
               <option value="team">Team</option>
               <option value="strength">Strength</option>
@@ -1220,7 +1195,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.app = new LogbookApp();
   } catch (error) {
     console.error('App initialization error:', error);
-    // Show auth view as fallback
     document.getElementById('auth-view').classList.remove('hidden');
     document.getElementById('main-app').classList.add('hidden');
   }

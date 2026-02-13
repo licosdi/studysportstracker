@@ -60,6 +60,25 @@ export const createTables = (db) => {
     )
   `);
 
+  // Weekly Plan Items (repeating weekly schedule)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS weekly_plan_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      area TEXT NOT NULL CHECK(area IN ('study', 'football')),
+      day_of_week INTEGER NOT NULL CHECK(day_of_week >= 0 AND day_of_week <= 6),
+      category_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      notes TEXT,
+      duration_minutes INTEGER DEFAULT 45,
+      intensity TEXT CHECK(intensity IN ('low', 'medium', 'high')),
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
   // Log Entries (actual completed work)
   db.exec(`
     CREATE TABLE IF NOT EXISTS log_entries (
@@ -80,6 +99,13 @@ export const createTables = (db) => {
     )
   `);
 
+  // Add weekly_plan_item_id column to log_entries (for existing databases)
+  try {
+    db.exec(`ALTER TABLE log_entries ADD COLUMN weekly_plan_item_id INTEGER REFERENCES weekly_plan_items(id) ON DELETE SET NULL`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   // Create indexes for better query performance
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_study_categories_user ON study_categories(user_id);
@@ -89,6 +115,10 @@ export const createTables = (db) => {
     CREATE INDEX IF NOT EXISTS idx_log_entries_user_date ON log_entries(user_id, date_time);
     CREATE INDEX IF NOT EXISTS idx_log_entries_area ON log_entries(area);
     CREATE INDEX IF NOT EXISTS idx_log_entries_category ON log_entries(category_id);
+    CREATE INDEX IF NOT EXISTS idx_weekly_plan_items_user ON weekly_plan_items(user_id);
+    CREATE INDEX IF NOT EXISTS idx_weekly_plan_items_area ON weekly_plan_items(area);
+    CREATE INDEX IF NOT EXISTS idx_weekly_plan_items_day ON weekly_plan_items(day_of_week);
+    CREATE INDEX IF NOT EXISTS idx_log_entries_weekly_plan ON log_entries(weekly_plan_item_id);
   `);
 
   console.log('Database tables created successfully');

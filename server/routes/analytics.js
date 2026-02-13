@@ -7,10 +7,10 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticateToken);
 
-// Get weekly stats
+// Get weekly stats (optional area filter for per-area stats views)
 router.get('/weekly', (req, res) => {
   try {
-    const { weekStart } = req.query;
+    const { weekStart, area } = req.query;
 
     if (!weekStart) {
       return res.status(400).json({ error: 'weekStart is required (YYYY-MM-DD)' });
@@ -23,18 +23,24 @@ router.get('/weekly', (req, res) => {
     const endStr = end.toISOString().split('T')[0];
 
     // Get totals by area
-    const totals = db.prepare(`
+    let totalsQuery = `
       SELECT
         area,
         SUM(duration_minutes) as totalMinutes,
         COUNT(*) as totalSessions
       FROM log_entries
       WHERE user_id = ? AND DATE(date_time) >= ? AND DATE(date_time) <= ?
-      GROUP BY area
-    `).all(req.user.id, weekStart, endStr);
+    `;
+    const totalsParams = [req.user.id, weekStart, endStr];
+    if (area && ['study', 'football'].includes(area)) {
+      totalsQuery += ' AND area = ?';
+      totalsParams.push(area);
+    }
+    totalsQuery += ' GROUP BY area';
+    const totals = db.prepare(totalsQuery).all(...totalsParams);
 
     // Get study breakdown by category
-    const studyBreakdown = db.prepare(`
+    const studyBreakdown = (!area || area === 'study') ? db.prepare(`
       SELECT
         l.category_id as categoryId,
         sc.name as categoryName,
@@ -46,10 +52,10 @@ router.get('/weekly', (req, res) => {
       WHERE l.user_id = ? AND l.area = 'study' AND DATE(l.date_time) >= ? AND DATE(l.date_time) <= ?
       GROUP BY l.category_id
       ORDER BY totalMinutes DESC
-    `).all(req.user.id, weekStart, endStr);
+    `).all(req.user.id, weekStart, endStr) : [];
 
     // Get football breakdown by category
-    const footballBreakdown = db.prepare(`
+    const footballBreakdown = (!area || area === 'football') ? db.prepare(`
       SELECT
         l.category_id as categoryId,
         fc.name as categoryName,
@@ -62,10 +68,10 @@ router.get('/weekly', (req, res) => {
       WHERE l.user_id = ? AND l.area = 'football' AND DATE(l.date_time) >= ? AND DATE(l.date_time) <= ?
       GROUP BY l.category_id
       ORDER BY totalMinutes DESC
-    `).all(req.user.id, weekStart, endStr);
+    `).all(req.user.id, weekStart, endStr) : [];
 
     // Get daily breakdown
-    const dailyBreakdown = db.prepare(`
+    let dailyQuery = `
       SELECT
         DATE(date_time) as date,
         area,
@@ -73,9 +79,14 @@ router.get('/weekly', (req, res) => {
         COUNT(*) as sessions
       FROM log_entries
       WHERE user_id = ? AND DATE(date_time) >= ? AND DATE(date_time) <= ?
-      GROUP BY DATE(date_time), area
-      ORDER BY date ASC
-    `).all(req.user.id, weekStart, endStr);
+    `;
+    const dailyParams = [req.user.id, weekStart, endStr];
+    if (area && ['study', 'football'].includes(area)) {
+      dailyQuery += ' AND area = ?';
+      dailyParams.push(area);
+    }
+    dailyQuery += ' GROUP BY DATE(date_time), area ORDER BY date ASC';
+    const dailyBreakdown = db.prepare(dailyQuery).all(...dailyParams);
 
     const studyTotal = totals.find(t => t.area === 'study') || { totalMinutes: 0, totalSessions: 0 };
     const footballTotal = totals.find(t => t.area === 'football') || { totalMinutes: 0, totalSessions: 0 };
@@ -101,10 +112,10 @@ router.get('/weekly', (req, res) => {
   }
 });
 
-// Get monthly stats
+// Get monthly stats (optional area filter for per-area stats views)
 router.get('/monthly', (req, res) => {
   try {
-    const { year, month } = req.query;
+    const { year, month, area } = req.query;
 
     if (!year || !month) {
       return res.status(400).json({ error: 'year and month are required' });
@@ -114,18 +125,24 @@ router.get('/monthly', (req, res) => {
     const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split('T')[0]; // Last day of month
 
     // Get totals by area
-    const totals = db.prepare(`
+    let totalsQuery = `
       SELECT
         area,
         SUM(duration_minutes) as totalMinutes,
         COUNT(*) as totalSessions
       FROM log_entries
       WHERE user_id = ? AND DATE(date_time) >= ? AND DATE(date_time) <= ?
-      GROUP BY area
-    `).all(req.user.id, startDate, endDate);
+    `;
+    const totalsParams = [req.user.id, startDate, endDate];
+    if (area && ['study', 'football'].includes(area)) {
+      totalsQuery += ' AND area = ?';
+      totalsParams.push(area);
+    }
+    totalsQuery += ' GROUP BY area';
+    const totals = db.prepare(totalsQuery).all(...totalsParams);
 
     // Get study breakdown by category
-    const studyBreakdown = db.prepare(`
+    const studyBreakdown = (!area || area === 'study') ? db.prepare(`
       SELECT
         l.category_id as categoryId,
         sc.name as categoryName,
@@ -137,10 +154,10 @@ router.get('/monthly', (req, res) => {
       WHERE l.user_id = ? AND l.area = 'study' AND DATE(l.date_time) >= ? AND DATE(l.date_time) <= ?
       GROUP BY l.category_id
       ORDER BY totalMinutes DESC
-    `).all(req.user.id, startDate, endDate);
+    `).all(req.user.id, startDate, endDate) : [];
 
     // Get football breakdown by category
-    const footballBreakdown = db.prepare(`
+    const footballBreakdown = (!area || area === 'football') ? db.prepare(`
       SELECT
         l.category_id as categoryId,
         fc.name as categoryName,
@@ -153,10 +170,10 @@ router.get('/monthly', (req, res) => {
       WHERE l.user_id = ? AND l.area = 'football' AND DATE(l.date_time) >= ? AND DATE(l.date_time) <= ?
       GROUP BY l.category_id
       ORDER BY totalMinutes DESC
-    `).all(req.user.id, startDate, endDate);
+    `).all(req.user.id, startDate, endDate) : [];
 
     // Get weekly breakdown within month
-    const weeklyBreakdown = db.prepare(`
+    let weeklyQuery = `
       SELECT
         strftime('%W', date_time) as weekNumber,
         area,
@@ -164,9 +181,14 @@ router.get('/monthly', (req, res) => {
         COUNT(*) as sessions
       FROM log_entries
       WHERE user_id = ? AND DATE(date_time) >= ? AND DATE(date_time) <= ?
-      GROUP BY weekNumber, area
-      ORDER BY weekNumber ASC
-    `).all(req.user.id, startDate, endDate);
+    `;
+    const weeklyParams = [req.user.id, startDate, endDate];
+    if (area && ['study', 'football'].includes(area)) {
+      weeklyQuery += ' AND area = ?';
+      weeklyParams.push(area);
+    }
+    weeklyQuery += ' GROUP BY weekNumber, area ORDER BY weekNumber ASC';
+    const weeklyBreakdown = db.prepare(weeklyQuery).all(...weeklyParams);
 
     const studyTotal = totals.find(t => t.area === 'study') || { totalMinutes: 0, totalSessions: 0 };
     const footballTotal = totals.find(t => t.area === 'football') || { totalMinutes: 0, totalSessions: 0 };
@@ -228,11 +250,34 @@ router.get('/dashboard', (req, res) => {
       GROUP BY area
     `).all(req.user.id, weekStart, weekEnd);
 
-    // Pending plan items for today
-    const pendingToday = db.prepare(`
-      SELECT COUNT(*) as count FROM plan_items
-      WHERE user_id = ? AND date = ? AND status = 'planned'
-    `).get(req.user.id, today);
+    // Today's schedule from weekly plan (day_of_week: 0=Monday ... 6=Sunday)
+    const jsDay = new Date(today).getDay(); // 0=Sunday
+    const todayDow = (jsDay + 6) % 7; // Convert to 0=Monday
+
+    // Get weekly plan items for today that haven't been completed this week
+    const todaySchedule = db.prepare(`
+      SELECT
+        w.id, w.area, w.title, w.duration_minutes as durationMinutes, w.intensity,
+        CASE
+          WHEN w.area = 'study' THEN sc.name
+          WHEN w.area = 'football' THEN fc.name
+        END as categoryName,
+        CASE
+          WHEN w.area = 'study' THEN sc.color
+          WHEN w.area = 'football' THEN fc.color
+        END as categoryColor,
+        CASE WHEN l.id IS NOT NULL THEN 1 ELSE 0 END as isCompleted
+      FROM weekly_plan_items w
+      LEFT JOIN study_categories sc ON w.category_id = sc.id AND w.area = 'study'
+      LEFT JOIN football_categories fc ON w.category_id = fc.id AND w.area = 'football'
+      LEFT JOIN log_entries l ON l.weekly_plan_item_id = w.id
+        AND DATE(l.date_time) >= ? AND DATE(l.date_time) <= ?
+        AND l.user_id = ?
+      WHERE w.user_id = ? AND w.day_of_week = ? AND w.is_active = 1
+      ORDER BY w.created_at ASC
+    `).all(weekStart, weekEnd, req.user.id, req.user.id, todayDow);
+
+    const pendingToday = { count: todaySchedule.filter(s => !s.isCompleted).length };
 
     // Recent log entries (last 5)
     const recentLogs = db.prepare(`
@@ -264,7 +309,8 @@ router.get('/dashboard', (req, res) => {
         date: today,
         study: { minutes: todayStudy.totalMinutes || 0, sessions: todayStudy.sessions || 0 },
         football: { minutes: todayFootball.totalMinutes || 0, sessions: todayFootball.sessions || 0 },
-        pendingPlans: pendingToday.count
+        pendingPlans: pendingToday.count,
+        schedule: todaySchedule
       },
       week: {
         startDate: weekStart,

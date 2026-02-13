@@ -156,18 +156,58 @@ class API {
     return await this.request('DELETE', `/api/logs/${id}`);
   }
 
+  // ==================== WEEKLY PLANS ====================
+
+  async getWeeklyPlans(area = null) {
+    const params = {};
+    if (area) params.area = area;
+    const query = new URLSearchParams(params).toString();
+    return await this.request('GET', `/api/weekly-plans${query ? '?' + query : ''}`);
+  }
+
+  async createWeeklyPlan(data) {
+    return await this.request('POST', '/api/weekly-plans', data);
+  }
+
+  async updateWeeklyPlan(id, data) {
+    return await this.request('PUT', `/api/weekly-plans/${id}`, data);
+  }
+
+  async deleteWeeklyPlan(id) {
+    return await this.request('DELETE', `/api/weekly-plans/${id}`);
+  }
+
+  async completeWeeklyPlan(id) {
+    return await this.request('POST', `/api/weekly-plans/${id}/complete`);
+  }
+
+  async uncompleteWeeklyPlan(id) {
+    return await this.request('POST', `/api/weekly-plans/${id}/uncomplete`);
+  }
+
+  async getWeeklyPlanStatus(weekStart, area = null) {
+    const params = { weekStart };
+    if (area) params.area = area;
+    const query = new URLSearchParams(params).toString();
+    return await this.request('GET', `/api/weekly-plans/week-status?${query}`);
+  }
+
   // ==================== ANALYTICS ====================
 
   async getDashboard() {
     return await this.request('GET', '/api/analytics/dashboard');
   }
 
-  async getWeeklyStats(weekStart) {
-    return await this.request('GET', `/api/analytics/weekly?weekStart=${weekStart}`);
+  async getWeeklyStats(weekStart, area = null) {
+    let url = `/api/analytics/weekly?weekStart=${weekStart}`;
+    if (area) url += `&area=${area}`;
+    return await this.request('GET', url);
   }
 
-  async getMonthlyStats(year, month) {
-    return await this.request('GET', `/api/analytics/monthly?year=${year}&month=${month}`);
+  async getMonthlyStats(year, month, area = null) {
+    let url = `/api/analytics/monthly?year=${year}&month=${month}`;
+    if (area) url += `&area=${area}`;
+    return await this.request('GET', url);
   }
 }
 
