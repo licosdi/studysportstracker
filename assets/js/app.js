@@ -9,6 +9,8 @@ class LogbookApp {
     // Per-area stats state
     this.studyStatsMode = 'weekly';
     this.studyStatsDate = new Date();
+    this.footballStatsMode = 'weekly';
+    this.footballStatsDate = new Date();
 
     // Timer state
     this.timers = {
@@ -237,12 +239,15 @@ class LogbookApp {
 
     // Weekly Plan buttons
     document.getElementById('add-study-weekly-plan-btn').addEventListener('click', () => this.openWeeklyPlanModal('study'));
+    document.getElementById('add-football-weekly-plan-btn').addEventListener('click', () => this.openWeeklyPlanModal('football'));
 
     // Inline log buttons
     document.getElementById('add-study-log-inline-btn').addEventListener('click', () => this.openLogModal('study'));
+    document.getElementById('add-football-log-inline-btn').addEventListener('click', () => this.openLogModal('football'));
 
     // Embedded log filters
     document.getElementById('study-embedded-log-filter').addEventListener('change', () => this.loadStudyEmbeddedLogs());
+    document.getElementById('football-embedded-log-filter').addEventListener('change', () => this.loadFootballEmbeddedLogs());
 
     // Study stats
     document.querySelectorAll('[data-stats-area="study"]').forEach(btn => {
@@ -251,6 +256,12 @@ class LogbookApp {
     document.getElementById('study-stats-prev').addEventListener('click', () => this.changeStudyStatsPeriod(-1));
     document.getElementById('study-stats-next').addEventListener('click', () => this.changeStudyStatsPeriod(1));
 
+    // Football stats
+    document.querySelectorAll('[data-stats-area="football"]').forEach(btn => {
+      btn.addEventListener('click', () => this.setFootballStatsPeriod(btn.dataset.statsPeriod));
+    });
+    document.getElementById('football-stats-prev').addEventListener('click', () => this.changeFootballStatsPeriod(-1));
+    document.getElementById('football-stats-next').addEventListener('click', () => this.changeFootballStatsPeriod(1));
 
     // Settings tabs
     document.querySelectorAll('.settings-tab').forEach(tab => {
@@ -300,6 +311,8 @@ class LogbookApp {
       case 'study-timer': this.loadStudyTimer(); break;
       case 'study-weekly-plan': this.loadStudyWeeklyPlan(); break;
       case 'study-stats': this.loadStudyStats(); break;
+      case 'football-weekly-plan': this.loadFootballWeeklyPlan(); break;
+      case 'football-stats': this.loadFootballStats(); break;
       case 'settings': this.loadSettings(); break;
     }
   }
@@ -528,6 +541,17 @@ class LogbookApp {
     }
   }
 
+  async loadFootballWeeklyPlan() {
+    const weekStart = this.formatDate(this.getWeekStart(new Date()));
+    try {
+      const { items } = await api.getWeeklyPlanStatus(weekStart, 'football');
+      this.renderWeeklyPlanGrid('football-weekly-plan-grid', items, 'football');
+      this.updateWeeklyProgress(items, 'football');
+      this.loadFootballEmbeddedLogs();
+    } catch (error) {
+      console.error('Failed to load football weekly plan:', error);
+    }
+  }
 
   renderWeeklyPlanGrid(containerId, items, area) {
     const container = document.getElementById(containerId);
@@ -606,20 +630,24 @@ class LogbookApp {
   async completeWeeklyPlan(id, area) {
     try {
       await api.completeWeeklyPlan(id);
-      this.loadStudyWeeklyPlan();
+      if (area === 'study') this.loadStudyWeeklyPlan();
+      else this.loadFootballWeeklyPlan();
     } catch (error) {
       alert(error.message);
-      this.loadStudyWeeklyPlan();
+      if (area === 'study') this.loadStudyWeeklyPlan();
+      else this.loadFootballWeeklyPlan();
     }
   }
 
   async uncompleteWeeklyPlan(id, area) {
     try {
       await api.uncompleteWeeklyPlan(id);
-      this.loadStudyWeeklyPlan();
+      if (area === 'study') this.loadStudyWeeklyPlan();
+      else this.loadFootballWeeklyPlan();
     } catch (error) {
       alert(error.message);
-      this.loadStudyWeeklyPlan();
+      if (area === 'study') this.loadStudyWeeklyPlan();
+      else this.loadFootballWeeklyPlan();
     }
   }
 
@@ -627,7 +655,8 @@ class LogbookApp {
     if (!confirm('Remove this item from your weekly plan?')) return;
     try {
       await api.deleteWeeklyPlan(id);
-      this.loadStudyWeeklyPlan();
+      if (area === 'study') this.loadStudyWeeklyPlan();
+      else this.loadFootballWeeklyPlan();
     } catch (error) {
       alert(error.message);
     }
@@ -655,6 +684,25 @@ class LogbookApp {
     }
   }
 
+  async loadFootballEmbeddedLogs() {
+    const filter = document.getElementById('football-embedded-log-filter').value;
+    const params = { area: 'football' };
+
+    const today = new Date();
+    if (filter === 'week') {
+      const weekStart = this.getWeekStart(today);
+      params.startDate = this.formatDate(weekStart);
+    } else if (filter === 'month') {
+      params.startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+    }
+
+    try {
+      const { entries } = await api.getLogs(params);
+      this.renderLogList('football-embedded-log-list', entries, 'football');
+    } catch (error) {
+      console.error('Failed to load football logs:', error);
+    }
+  }
 
   renderLogList(containerId, entries, area) {
     const container = document.getElementById(containerId);
@@ -691,7 +739,8 @@ class LogbookApp {
     if (!confirm('Delete this log entry?')) return;
     try {
       await api.deleteLog(id);
-      this.loadStudyEmbeddedLogs();
+      if (area === 'study') this.loadStudyEmbeddedLogs();
+      else this.loadFootballEmbeddedLogs();
     } catch (error) {
       alert(error.message);
     }
@@ -784,6 +833,46 @@ class LogbookApp {
     this.loadStudyStats();
   }
 
+  async loadFootballStats() {
+    if (this.footballStatsMode === 'weekly') {
+      const weekStart = this.getWeekStart(this.footballStatsDate);
+      document.getElementById('football-stats-period-display').textContent = this.formatWeekDisplay(weekStart);
+      try {
+        const data = await api.getWeeklyStats(this.formatDate(weekStart), 'football');
+        this.renderAreaStats('football', data);
+      } catch (error) {
+        console.error('Failed to load football stats:', error);
+      }
+    } else {
+      const year = this.footballStatsDate.getFullYear();
+      const month = this.footballStatsDate.getMonth() + 1;
+      document.getElementById('football-stats-period-display').textContent =
+        this.footballStatsDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      try {
+        const data = await api.getMonthlyStats(year, month, 'football');
+        this.renderAreaStats('football', data);
+      } catch (error) {
+        console.error('Failed to load football stats:', error);
+      }
+    }
+  }
+
+  setFootballStatsPeriod(mode) {
+    this.footballStatsMode = mode;
+    document.querySelectorAll('[data-stats-area="football"]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.statsPeriod === mode);
+    });
+    this.loadFootballStats();
+  }
+
+  changeFootballStatsPeriod(delta) {
+    if (this.footballStatsMode === 'weekly') {
+      this.footballStatsDate.setDate(this.footballStatsDate.getDate() + (delta * 7));
+    } else {
+      this.footballStatsDate.setMonth(this.footballStatsDate.getMonth() + delta);
+    }
+    this.loadFootballStats();
+  }
 
   // ==================== SETTINGS ====================
 
@@ -948,7 +1037,7 @@ class LogbookApp {
     const now = new Date();
     const dateTimeStr = now.toISOString().slice(0, 16);
 
-    this.openModal(`Add Study Log`, `
+    this.openModal(`Add ${area === 'study' ? 'Study' : 'Football'} Log`, `
       <form id="log-form">
         <div class="form-group">
           <label>Date & Time</label>
@@ -988,7 +1077,8 @@ class LogbookApp {
           notes: document.getElementById('log-notes').value || null
         });
         this.closeModal();
-        this.loadStudyEmbeddedLogs();
+        if (area === 'study') this.loadStudyEmbeddedLogs();
+        else this.loadFootballEmbeddedLogs();
       } catch (error) {
         alert(error.message);
       }

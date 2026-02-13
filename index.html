@@ -85,6 +85,19 @@
               Stats
             </a>
           </li>
+          <li class="nav-section">Football</li>
+          <li class="nav-item">
+            <a href="#" class="nav-link" data-view="football-weekly-plan">
+              <span class="nav-icon">&#9917;</span>
+              Weekly Plan
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="#" class="nav-link" data-view="football-stats">
+              <span class="nav-icon">&#128202;</span>
+              Stats
+            </a>
+          </li>
           <li class="nav-section">Account</li>
           <li class="nav-item">
             <a href="#" class="nav-link" data-view="settings">
@@ -283,6 +296,76 @@
           </div>
         </section>
 
+
+        <!-- Football Weekly Plan View -->
+        <section id="football-weekly-plan-view" class="view">
+          <div class="view-header">
+            <h2>Football Weekly Training Plan</h2>
+            <div class="view-actions">
+              <button class="btn btn-primary" id="add-football-weekly-plan-btn">+ Add to Plan</button>
+            </div>
+          </div>
+          <div class="weekly-plan-grid" id="football-weekly-plan-grid">
+            <!-- 7 day columns rendered by JS -->
+          </div>
+          <div class="weekly-progress" id="football-weekly-progress">
+            <h3>This Week's Progress</h3>
+            <div class="progress-bar-container">
+              <div class="progress-bar" id="football-progress-bar"></div>
+            </div>
+            <span id="football-progress-text" class="progress-text">0 of 0 completed</span>
+          </div>
+          <div class="card" style="margin-top: 2rem;">
+            <div class="card-header">
+              <h3>Activity Log</h3>
+              <div class="view-actions">
+                <select id="football-embedded-log-filter" class="form-select">
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="all">All Time</option>
+                </select>
+                <button class="btn btn-primary btn-sm" id="add-football-log-inline-btn">+ Add Log</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="log-list log-list-compact" id="football-embedded-log-list">
+                <p class="empty-state">No football logs yet</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Football Stats View -->
+        <section id="football-stats-view" class="view">
+          <div class="view-header">
+            <h2>Football Stats</h2>
+            <div class="view-actions">
+              <div class="btn-group">
+                <button class="btn btn-secondary active" data-stats-period="weekly" data-stats-area="football">Weekly</button>
+                <button class="btn btn-secondary" data-stats-period="monthly" data-stats-area="football">Monthly</button>
+              </div>
+              <button class="btn btn-ghost" id="football-stats-prev">&larr;</button>
+              <span id="football-stats-period-display" class="week-display"></span>
+              <button class="btn btn-ghost" id="football-stats-next">&rarr;</button>
+            </div>
+          </div>
+          <div class="analytics-card">
+            <h3>Football</h3>
+            <div class="analytics-total">
+              <span id="football-stats-time">0h 0m</span>
+              <span class="analytics-sessions">(<span id="football-stats-sessions">0</span> sessions)</span>
+            </div>
+            <div class="analytics-breakdown" id="football-stats-breakdown">
+            </div>
+          </div>
+          <div class="card" style="margin-top: 1.5rem;">
+            <div class="card-header"><h3>Daily Breakdown</h3></div>
+            <div class="card-body">
+              <div class="chart-container" id="football-daily-chart">
+              </div>
+            </div>
+          </div>
+        </section>
 
         <!-- Settings View -->
         <section id="settings-view" class="view">
