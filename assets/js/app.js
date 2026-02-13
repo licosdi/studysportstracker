@@ -9,8 +9,6 @@ class LogbookApp {
     // Per-area stats state
     this.studyStatsMode = 'weekly';
     this.studyStatsDate = new Date();
-    this.footballStatsMode = 'weekly';
-    this.footballStatsDate = new Date();
 
     // Timer state
     this.timers = {
@@ -24,17 +22,6 @@ class LogbookApp {
         interval: null,
         categoryId: null
       },
-      football: {
-        duration: 45,
-        remaining: 45 * 60,
-        breakRemaining: 5 * 60,
-        isRunning: false,
-        isPaused: false,
-        isBreak: false,
-        interval: null,
-        categoryId: null,
-        intensity: 'medium'
-      }
     };
 
     this.init();
@@ -250,15 +237,12 @@ class LogbookApp {
 
     // Weekly Plan buttons
     document.getElementById('add-study-weekly-plan-btn').addEventListener('click', () => this.openWeeklyPlanModal('study'));
-    document.getElementById('add-football-weekly-plan-btn').addEventListener('click', () => this.openWeeklyPlanModal('football'));
 
     // Inline log buttons
     document.getElementById('add-study-log-inline-btn').addEventListener('click', () => this.openLogModal('study'));
-    document.getElementById('add-football-log-inline-btn').addEventListener('click', () => this.openLogModal('football'));
 
     // Embedded log filters
     document.getElementById('study-embedded-log-filter').addEventListener('change', () => this.loadStudyEmbeddedLogs());
-    document.getElementById('football-embedded-log-filter').addEventListener('change', () => this.loadFootballEmbeddedLogs());
 
     // Study stats
     document.querySelectorAll('[data-stats-area="study"]').forEach(btn => {
@@ -267,12 +251,6 @@ class LogbookApp {
     document.getElementById('study-stats-prev').addEventListener('click', () => this.changeStudyStatsPeriod(-1));
     document.getElementById('study-stats-next').addEventListener('click', () => this.changeStudyStatsPeriod(1));
 
-    // Football stats
-    document.querySelectorAll('[data-stats-area="football"]').forEach(btn => {
-      btn.addEventListener('click', () => this.setFootballStatsPeriod(btn.dataset.statsPeriod));
-    });
-    document.getElementById('football-stats-prev').addEventListener('click', () => this.changeFootballStatsPeriod(-1));
-    document.getElementById('football-stats-next').addEventListener('click', () => this.changeFootballStatsPeriod(1));
 
     // Settings tabs
     document.querySelectorAll('.settings-tab').forEach(tab => {
@@ -307,13 +285,6 @@ class LogbookApp {
     document.getElementById('study-start-break-btn')?.addEventListener('click', () => this.startBreak('study'));
     document.getElementById('study-skip-break-btn')?.addEventListener('click', () => this.skipBreak('study'));
 
-    // Football timer
-    document.getElementById('football-start-btn')?.addEventListener('click', () => this.startTimer('football'));
-    document.getElementById('football-pause-btn')?.addEventListener('click', () => this.pauseTimer('football'));
-    document.getElementById('football-reset-btn')?.addEventListener('click', () => this.resetTimer('football'));
-    document.getElementById('football-timer-duration')?.addEventListener('change', (e) => this.setTimerDuration('football', parseInt(e.target.value)));
-    document.getElementById('football-start-break-btn')?.addEventListener('click', () => this.startBreak('football'));
-    document.getElementById('football-skip-break-btn')?.addEventListener('click', () => this.skipBreak('football'));
   }
 
   navigateTo(view) {
@@ -329,9 +300,6 @@ class LogbookApp {
       case 'study-timer': this.loadStudyTimer(); break;
       case 'study-weekly-plan': this.loadStudyWeeklyPlan(); break;
       case 'study-stats': this.loadStudyStats(); break;
-      case 'football-timer': this.loadFootballTimer(); break;
-      case 'football-weekly-plan': this.loadFootballWeeklyPlan(); break;
-      case 'football-stats': this.loadFootballStats(); break;
       case 'settings': this.loadSettings(); break;
     }
   }
@@ -343,10 +311,6 @@ class LogbookApp {
     this.updateTimerDisplay('study');
   }
 
-  loadFootballTimer() {
-    this.populateTimerCategories('football');
-    this.updateTimerDisplay('football');
-  }
 
   populateTimerCategories(area) {
     const select = document.getElementById(`${area}-timer-category`);
@@ -508,10 +472,6 @@ class LogbookApp {
         notes: 'Completed via Pomodoro timer'
       };
 
-      if (area === 'football') {
-        logData.intensity = document.getElementById('football-timer-intensity')?.value || 'medium';
-      }
-
       await api.createLog(logData);
 
       alert(`Great job! You completed ${timer.duration} minutes of ${category?.name || area}!`);
@@ -568,17 +528,6 @@ class LogbookApp {
     }
   }
 
-  async loadFootballWeeklyPlan() {
-    const weekStart = this.formatDate(this.getWeekStart(new Date()));
-    try {
-      const { items } = await api.getWeeklyPlanStatus(weekStart, 'football');
-      this.renderWeeklyPlanGrid('football-weekly-plan-grid', items, 'football');
-      this.updateWeeklyProgress(items, 'football');
-      this.loadFootballEmbeddedLogs();
-    } catch (error) {
-      console.error('Failed to load football weekly plan:', error);
-    }
-  }
 
   renderWeeklyPlanGrid(containerId, items, area) {
     const container = document.getElementById(containerId);
@@ -605,8 +554,7 @@ class LogbookApp {
                   </label>
                   <div class="plan-content">
                     <span class="category-badge" style="background: ${item.categoryColor}">${item.categoryName}</span>
-                    <div class="plan-item-title">${item.title}</div>
-                    <div class="plan-item-meta">${item.durationMinutes}m${item.intensity ? ' &middot; ' + item.intensity : ''}</div>
+                    <div class="plan-item-meta">${item.durationMinutes}m</div>
                   </div>
                   <div class="plan-item-actions">
                     <button class="delete-btn" data-weekly-id="${item.id}" title="Remove">&#128465;</button>
@@ -658,25 +606,20 @@ class LogbookApp {
   async completeWeeklyPlan(id, area) {
     try {
       await api.completeWeeklyPlan(id);
-      if (area === 'study') this.loadStudyWeeklyPlan();
-      else this.loadFootballWeeklyPlan();
+      this.loadStudyWeeklyPlan();
     } catch (error) {
       alert(error.message);
-      // Reload to reset checkbox state
-      if (area === 'study') this.loadStudyWeeklyPlan();
-      else this.loadFootballWeeklyPlan();
+      this.loadStudyWeeklyPlan();
     }
   }
 
   async uncompleteWeeklyPlan(id, area) {
     try {
       await api.uncompleteWeeklyPlan(id);
-      if (area === 'study') this.loadStudyWeeklyPlan();
-      else this.loadFootballWeeklyPlan();
+      this.loadStudyWeeklyPlan();
     } catch (error) {
       alert(error.message);
-      if (area === 'study') this.loadStudyWeeklyPlan();
-      else this.loadFootballWeeklyPlan();
+      this.loadStudyWeeklyPlan();
     }
   }
 
@@ -684,8 +627,7 @@ class LogbookApp {
     if (!confirm('Remove this item from your weekly plan?')) return;
     try {
       await api.deleteWeeklyPlan(id);
-      if (area === 'study') this.loadStudyWeeklyPlan();
-      else this.loadFootballWeeklyPlan();
+      this.loadStudyWeeklyPlan();
     } catch (error) {
       alert(error.message);
     }
@@ -713,25 +655,6 @@ class LogbookApp {
     }
   }
 
-  async loadFootballEmbeddedLogs() {
-    const filter = document.getElementById('football-embedded-log-filter').value;
-    const params = { area: 'football' };
-
-    const today = new Date();
-    if (filter === 'week') {
-      const weekStart = this.getWeekStart(today);
-      params.startDate = this.formatDate(weekStart);
-    } else if (filter === 'month') {
-      params.startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
-    }
-
-    try {
-      const { entries } = await api.getLogs(params);
-      this.renderLogList('football-embedded-log-list', entries, 'football');
-    } catch (error) {
-      console.error('Failed to load football logs:', error);
-    }
-  }
 
   renderLogList(containerId, entries, area) {
     const container = document.getElementById(containerId);
@@ -745,7 +668,6 @@ class LogbookApp {
         <div class="log-item-main">
           <span class="category-badge" style="background: ${entry.categoryColor}">${entry.categoryName}</span>
           <span class="log-item-title">${entry.title}</span>
-          ${entry.intensity ? `<span class="intensity-badge ${entry.intensity}">${entry.intensity}</span>` : ''}
         </div>
         <div class="log-item-meta">
           <span class="log-item-duration">${this.formatDuration(entry.durationMinutes)}</span>
@@ -769,8 +691,7 @@ class LogbookApp {
     if (!confirm('Delete this log entry?')) return;
     try {
       await api.deleteLog(id);
-      if (area === 'study') this.loadStudyEmbeddedLogs();
-      else this.loadFootballEmbeddedLogs();
+      this.loadStudyEmbeddedLogs();
     } catch (error) {
       alert(error.message);
     }
@@ -802,29 +723,6 @@ class LogbookApp {
     }
   }
 
-  async loadFootballStats() {
-    if (this.footballStatsMode === 'weekly') {
-      const weekStart = this.getWeekStart(this.footballStatsDate);
-      document.getElementById('football-stats-period-display').textContent = this.formatWeekDisplay(weekStart);
-      try {
-        const data = await api.getWeeklyStats(this.formatDate(weekStart), 'football');
-        this.renderAreaStats('football', data);
-      } catch (error) {
-        console.error('Failed to load football stats:', error);
-      }
-    } else {
-      const year = this.footballStatsDate.getFullYear();
-      const month = this.footballStatsDate.getMonth() + 1;
-      document.getElementById('football-stats-period-display').textContent =
-        this.footballStatsDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      try {
-        const data = await api.getMonthlyStats(year, month, 'football');
-        this.renderAreaStats('football', data);
-      } catch (error) {
-        console.error('Failed to load football stats:', error);
-      }
-    }
-  }
 
   renderAreaStats(area, data) {
     const areaData = data[area] || { totalMinutes: 0, totalSessions: 0, breakdown: [] };
@@ -886,22 +784,6 @@ class LogbookApp {
     this.loadStudyStats();
   }
 
-  setFootballStatsPeriod(mode) {
-    this.footballStatsMode = mode;
-    document.querySelectorAll('[data-stats-area="football"]').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.statsPeriod === mode);
-    });
-    this.loadFootballStats();
-  }
-
-  changeFootballStatsPeriod(delta) {
-    if (this.footballStatsMode === 'weekly') {
-      this.footballStatsDate.setDate(this.footballStatsDate.getDate() + (delta * 7));
-    } else {
-      this.footballStatsDate.setMonth(this.footballStatsDate.getMonth() + delta);
-    }
-    this.loadFootballStats();
-  }
 
   // ==================== SETTINGS ====================
 
@@ -1032,21 +914,8 @@ class LogbookApp {
           </select>
         </div>
         <div class="form-group">
-          <label>Title</label>
-          <input type="text" id="weekly-plan-title" class="form-input" placeholder="What will you do?" required>
-        </div>
-        <div class="form-group">
           <label>Duration (minutes)</label>
           <input type="number" id="weekly-plan-duration" class="form-input" value="45" min="5" max="480" required>
-        </div>
-        <div class="form-group">
-          <label>Intensity</label>
-          <select id="weekly-plan-intensity" class="form-select">
-            <option value="">None</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
         </div>
         <button type="submit" class="btn btn-primary btn-block">Add to Weekly Plan</button>
       </form>
@@ -1055,13 +924,15 @@ class LogbookApp {
     document.getElementById('weekly-plan-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       try {
+        const selectedCatId = parseInt(document.getElementById('weekly-plan-category').value);
+        const selectedCat = categories.find(c => c.id === selectedCatId);
         await api.createWeeklyPlan({
           area,
           dayOfWeek: parseInt(document.getElementById('weekly-plan-day').value),
-          categoryId: parseInt(document.getElementById('weekly-plan-category').value),
-          title: document.getElementById('weekly-plan-title').value,
+          categoryId: selectedCatId,
+          title: selectedCat ? selectedCat.name : 'Session',
           durationMinutes: parseInt(document.getElementById('weekly-plan-duration').value),
-          intensity: document.getElementById('weekly-plan-intensity').value || null
+          intensity: null
         });
         this.closeModal();
         if (area === 'study') this.loadStudyWeeklyPlan();
@@ -1077,7 +948,7 @@ class LogbookApp {
     const now = new Date();
     const dateTimeStr = now.toISOString().slice(0, 16);
 
-    this.openModal(`Add ${area === 'study' ? 'Study' : 'Football'} Log`, `
+    this.openModal(`Add Study Log`, `
       <form id="log-form">
         <div class="form-group">
           <label>Date & Time</label>
@@ -1098,15 +969,6 @@ class LogbookApp {
           <input type="number" id="log-duration" class="form-input" value="45" min="1" max="480" required>
         </div>
         <div class="form-group">
-          <label>Intensity</label>
-          <select id="log-intensity" class="form-select">
-            <option value="">None</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-        <div class="form-group">
           <label>Notes (optional)</label>
           <textarea id="log-notes" class="form-input" rows="2"></textarea>
         </div>
@@ -1123,12 +985,10 @@ class LogbookApp {
           categoryId: parseInt(document.getElementById('log-category').value),
           title: document.getElementById('log-title').value,
           durationMinutes: parseInt(document.getElementById('log-duration').value),
-          intensity: document.getElementById('log-intensity').value || null,
           notes: document.getElementById('log-notes').value || null
         });
         this.closeModal();
-        if (area === 'study') this.loadStudyEmbeddedLogs();
-        else this.loadFootballEmbeddedLogs();
+        this.loadStudyEmbeddedLogs();
       } catch (error) {
         alert(error.message);
       }
