@@ -1041,15 +1041,30 @@ class LogbookApp {
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     const todayIndex = (new Date().getDay() + 6) % 7;
     const defaultDay = preselectedDay !== null ? preselectedDay : todayIndex;
+    const multiDay = area === 'football';
 
-    this.openModal(`Add to ${area === 'study' ? 'Study' : 'Football'} Weekly Plan`, `
-      <form id="weekly-plan-form">
-        <div class="form-group">
+    const daySelector = multiDay
+      ? `<div class="form-group">
+          <label>Days</label>
+          <div class="day-checkboxes" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            ${days.map((d, i) => `
+              <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer;">
+                <input type="checkbox" name="weekly-plan-days" value="${i}" ${i === defaultDay ? 'checked' : ''}>
+                ${d.slice(0, 3)}
+              </label>
+            `).join('')}
+          </div>
+        </div>`
+      : `<div class="form-group">
           <label>Day of Week</label>
           <select id="weekly-plan-day" class="form-select" required>
             ${days.map((d, i) => `<option value="${i}" ${i === defaultDay ? 'selected' : ''}>${d}</option>`).join('')}
           </select>
-        </div>
+        </div>`;
+
+    this.openModal(`Add to ${area === 'study' ? 'Study' : 'Football'} Weekly Plan`, `
+      <form id="weekly-plan-form">
+        ${daySelector}
         <div class="form-group">
           <label>Category</label>
           <select id="weekly-plan-category" class="form-select" required>
@@ -1073,15 +1088,34 @@ class LogbookApp {
       try {
         const selectedCatId = parseInt(document.getElementById('weekly-plan-category').value);
         const selectedCat = categories.find(c => c.id === selectedCatId);
-        await api.createWeeklyPlan({
-          area,
-          dayOfWeek: parseInt(document.getElementById('weekly-plan-day').value),
-          categoryId: selectedCatId,
-          title: selectedCat ? selectedCat.name : 'Session',
-          durationMinutes: parseInt(document.getElementById('weekly-plan-duration').value),
-          intensity: null,
-          startTime: document.getElementById('weekly-plan-start-time').value || null
-        });
+        const durationMinutes = parseInt(document.getElementById('weekly-plan-duration').value);
+        const startTime = document.getElementById('weekly-plan-start-time').value || null;
+        const title = selectedCat ? selectedCat.name : 'Session';
+
+        let selectedDays;
+        if (multiDay) {
+          selectedDays = Array.from(document.querySelectorAll('input[name="weekly-plan-days"]:checked'))
+            .map(cb => parseInt(cb.value));
+          if (selectedDays.length === 0) {
+            alert('Please select at least one day.');
+            return;
+          }
+        } else {
+          selectedDays = [parseInt(document.getElementById('weekly-plan-day').value)];
+        }
+
+        for (const dayOfWeek of selectedDays) {
+          await api.createWeeklyPlan({
+            area,
+            dayOfWeek,
+            categoryId: selectedCatId,
+            title,
+            durationMinutes,
+            intensity: null,
+            startTime
+          });
+        }
+
         this.closeModal();
         if (area === 'study') this.loadStudyWeeklyPlan();
         else this.loadFootballWeeklyPlan();
