@@ -244,22 +244,15 @@
             </div>
             <span id="study-progress-text" class="progress-text">0 of 0 completed</span>
           </div>
-          <div class="card" style="margin-top: 2rem;">
-            <div class="card-header">
-              <h3>Activity Log</h3>
-              <div class="view-actions">
-                <select id="study-embedded-log-filter" class="form-select">
-                  <option value="week">This Week</option>
-                  <option value="month">This Month</option>
-                  <option value="all">All Time</option>
-                </select>
-                <button class="btn btn-primary btn-sm" id="add-study-log-inline-btn">+ Add Log</button>
-              </div>
+          <div class="timetable-container" style="margin-top: 2rem;">
+            <div class="timetable-header">
+              <h3>Weekly Timetable</h3>
             </div>
-            <div class="card-body">
-              <div class="log-list log-list-compact" id="study-embedded-log-list">
-                <p class="empty-state">No study logs yet</p>
-              </div>
+            <div class="timetable-grid" id="study-timetable-grid">
+              <!-- Rendered by JS -->
+            </div>
+            <div class="timetable-unscheduled" id="study-unscheduled-items">
+              <!-- Items without start_time -->
             </div>
           </div>
         </section>
@@ -315,22 +308,15 @@
             </div>
             <span id="football-progress-text" class="progress-text">0 of 0 completed</span>
           </div>
-          <div class="card" style="margin-top: 2rem;">
-            <div class="card-header">
-              <h3>Activity Log</h3>
-              <div class="view-actions">
-                <select id="football-embedded-log-filter" class="form-select">
-                  <option value="week">This Week</option>
-                  <option value="month">This Month</option>
-                  <option value="all">All Time</option>
-                </select>
-                <button class="btn btn-primary btn-sm" id="add-football-log-inline-btn">+ Add Log</button>
-              </div>
+          <div class="timetable-container" style="margin-top: 2rem;">
+            <div class="timetable-header">
+              <h3>Weekly Timetable</h3>
             </div>
-            <div class="card-body">
-              <div class="log-list log-list-compact" id="football-embedded-log-list">
-                <p class="empty-state">No football logs yet</p>
-              </div>
+            <div class="timetable-grid" id="football-timetable-grid">
+              <!-- Rendered by JS -->
+            </div>
+            <div class="timetable-unscheduled" id="football-unscheduled-items">
+              <!-- Items without start_time -->
             </div>
           </div>
         </section>

@@ -241,14 +241,6 @@ class LogbookApp {
     document.getElementById('add-study-weekly-plan-btn').addEventListener('click', () => this.openWeeklyPlanModal('study'));
     document.getElementById('add-football-weekly-plan-btn').addEventListener('click', () => this.openWeeklyPlanModal('football'));
 
-    // Inline log buttons
-    document.getElementById('add-study-log-inline-btn').addEventListener('click', () => this.openLogModal('study'));
-    document.getElementById('add-football-log-inline-btn').addEventListener('click', () => this.openLogModal('football'));
-
-    // Embedded log filters
-    document.getElementById('study-embedded-log-filter').addEventListener('change', () => this.loadStudyEmbeddedLogs());
-    document.getElementById('football-embedded-log-filter').addEventListener('change', () => this.loadFootballEmbeddedLogs());
-
     // Study stats
     document.querySelectorAll('[data-stats-area="study"]').forEach(btn => {
       btn.addEventListener('click', () => this.setStudyStatsPeriod(btn.dataset.statsPeriod));
@@ -535,7 +527,7 @@ class LogbookApp {
       const { items } = await api.getWeeklyPlanStatus(weekStart, 'study');
       this.renderWeeklyPlanGrid('study-weekly-plan-grid', items, 'study');
       this.updateWeeklyProgress(items, 'study');
-      this.loadStudyEmbeddedLogs();
+      this.renderTimetable('study', items);
     } catch (error) {
       console.error('Failed to load study weekly plan:', error);
     }
@@ -547,7 +539,7 @@ class LogbookApp {
       const { items } = await api.getWeeklyPlanStatus(weekStart, 'football');
       this.renderWeeklyPlanGrid('football-weekly-plan-grid', items, 'football');
       this.updateWeeklyProgress(items, 'football');
-      this.loadFootballEmbeddedLogs();
+      this.renderTimetable('football', items);
     } catch (error) {
       console.error('Failed to load football weekly plan:', error);
     }
@@ -662,88 +654,150 @@ class LogbookApp {
     }
   }
 
-  // ==================== EMBEDDED LOGS ====================
+  // ==================== TIMETABLE ====================
 
-  async loadStudyEmbeddedLogs() {
-    const filter = document.getElementById('study-embedded-log-filter').value;
-    const params = { area: 'study' };
+  renderTimetable(area, items) {
+    const container = document.getElementById(`${area}-timetable-grid`);
+    const unscheduledContainer = document.getElementById(`${area}-unscheduled-items`);
 
-    const today = new Date();
-    if (filter === 'week') {
-      const weekStart = this.getWeekStart(today);
-      params.startDate = this.formatDate(weekStart);
-    } else if (filter === 'month') {
-      params.startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const todayIndex = (new Date().getDay() + 6) % 7;
+
+    const startHour = 7;
+    const endHour = 18;
+    const totalSlots = (endHour - startHour) * 4; // 44 slots of 15min
+    const slotHeight = 25;
+
+    const scheduled = items.filter(item => item.startTime);
+    const unscheduled = items.filter(item => !item.startTime);
+
+    // Time column
+    let html = '<div class="timetable-time-column">';
+    for (let h = startHour; h < endHour; h++) {
+      const ampm = h < 12 ? 'AM' : 'PM';
+      const display = h <= 12 ? h : h - 12;
+      html += `<div class="timetable-hour-label">${display}:00 ${ampm}</div>`;
+    }
+    html += '</div>';
+
+    // Day columns
+    for (let d = 0; d < 7; d++) {
+      const isToday = d === todayIndex;
+      html += `<div class="timetable-day-column ${isToday ? 'today' : ''}" data-day="${d}">`;
+      html += `<div class="timetable-day-header">${days[d]}</div>`;
+      html += `<div class="timetable-day-slots" data-day="${d}" style="height: ${totalSlots * slotHeight}px;">`;
+
+      // 15-min slot drop zones
+      for (let slot = 0; slot < totalSlots; slot++) {
+        const minutes = slot * 15;
+        const hour = startHour + Math.floor(minutes / 60);
+        const min = minutes % 60;
+        const timeStr = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
+        const isHourBoundary = min === 0;
+        html += `<div class="timetable-slot ${isHourBoundary ? 'hour-boundary' : ''}" data-time="${timeStr}" data-day="${d}"></div>`;
+      }
+
+      // Positioned blocks
+      const dayItems = scheduled.filter(item => item.dayOfWeek === d);
+      for (const item of dayItems) {
+        const [h, m] = item.startTime.split(':').map(Number);
+        const slotOffset = (h - startHour) * 4 + Math.floor(m / 15);
+        const slotSpan = Math.ceil(item.durationMinutes / 15);
+
+        html += `<div class="timetable-block ${item.isCompleted ? 'completed' : ''}"
+                     draggable="true"
+                     data-id="${item.id}"
+                     data-area="${area}"
+                     style="top: ${slotOffset * slotHeight}px; height: ${slotSpan * slotHeight - 2}px; background: ${item.categoryColor};">
+                  <span class="timetable-block-title">${item.categoryName}</span>
+                  <span class="timetable-block-time">${item.startTime}</span>
+                  <span class="timetable-block-duration">${item.durationMinutes}m</span>
+                </div>`;
+      }
+
+      html += '</div></div>';
     }
 
-    try {
-      const { entries } = await api.getLogs(params);
-      this.renderLogList('study-embedded-log-list', entries, 'study');
-    } catch (error) {
-      console.error('Failed to load study logs:', error);
+    container.innerHTML = html;
+
+    // Auto-scroll to current hour
+    const now = new Date();
+    const scrollTo = Math.max(0, (now.getHours() - startHour) * 100 - 50);
+    container.scrollTop = scrollTo;
+
+    // Unscheduled items
+    if (unscheduled.length > 0) {
+      unscheduledContainer.innerHTML = `
+        <h4>Unscheduled</h4>
+        <div class="unscheduled-items-list">
+          ${unscheduled.map(item => `
+            <div class="timetable-block unscheduled"
+                 draggable="true" data-id="${item.id}" data-area="${area}"
+                 style="background: ${item.categoryColor};">
+              <span class="timetable-block-title">${item.categoryName}</span>
+              <span class="timetable-block-duration">${item.durationMinutes}m</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      unscheduledContainer.innerHTML = '';
     }
+
+    this.setupTimetableDragDrop(area);
   }
 
-  async loadFootballEmbeddedLogs() {
-    const filter = document.getElementById('football-embedded-log-filter').value;
-    const params = { area: 'football' };
+  setupTimetableDragDrop(area) {
+    const container = document.getElementById(`${area}-timetable-grid`);
+    const unscheduledContainer = document.getElementById(`${area}-unscheduled-items`);
 
-    const today = new Date();
-    if (filter === 'week') {
-      const weekStart = this.getWeekStart(today);
-      params.startDate = this.formatDate(weekStart);
-    } else if (filter === 'month') {
-      params.startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
-    }
+    const initDrag = (block) => {
+      block.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({
+          id: block.dataset.id,
+          area: block.dataset.area
+        }));
+        block.classList.add('dragging');
+      });
+      block.addEventListener('dragend', () => {
+        block.classList.remove('dragging');
+        container.querySelectorAll('.timetable-slot.drag-over').forEach(s =>
+          s.classList.remove('drag-over'));
+      });
+    };
 
-    try {
-      const { entries } = await api.getLogs(params);
-      this.renderLogList('football-embedded-log-list', entries, 'football');
-    } catch (error) {
-      console.error('Failed to load football logs:', error);
-    }
-  }
+    container.querySelectorAll('.timetable-block[draggable="true"]').forEach(initDrag);
+    unscheduledContainer?.querySelectorAll('.timetable-block[draggable="true"]').forEach(initDrag);
 
-  renderLogList(containerId, entries, area) {
-    const container = document.getElementById(containerId);
-    if (entries.length === 0) {
-      container.innerHTML = `<p class="empty-state">No ${area} logs yet</p>`;
-      return;
-    }
+    // Make slots droppable
+    container.querySelectorAll('.timetable-slot').forEach(slot => {
+      slot.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        slot.classList.add('drag-over');
+      });
+      slot.addEventListener('dragleave', () => {
+        slot.classList.remove('drag-over');
+      });
+      slot.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        slot.classList.remove('drag-over');
 
-    container.innerHTML = entries.map(entry => `
-      <div class="log-item" data-id="${entry.id}">
-        <div class="log-item-main">
-          <span class="category-badge" style="background: ${entry.categoryColor}">${entry.categoryName}</span>
-          <span class="log-item-title">${entry.title}</span>
-        </div>
-        <div class="log-item-meta">
-          <span class="log-item-duration">${this.formatDuration(entry.durationMinutes)}</span>
-          <span class="log-item-date">${this.formatDateTime(entry.dateTime)}</span>
-          ${entry.weeklyPlanItemId ? '<span class="from-plan-badge">from plan</span>' : ''}
-          ${entry.planItemId ? '<span class="from-plan-badge">from plan</span>' : ''}
-        </div>
-        ${entry.notes ? `<div class="log-item-notes">${entry.notes}</div>` : ''}
-        <div class="log-item-actions">
-          <button class="delete-btn" data-id="${entry.id}">Delete</button>
-        </div>
-      </div>
-    `).join('');
+        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+        const newDay = parseInt(slot.dataset.day);
+        const newTime = slot.dataset.time;
 
-    container.querySelectorAll('.log-item-actions .delete-btn').forEach(btn => {
-      btn.addEventListener('click', () => this.deleteLog(btn.dataset.id, area));
+        try {
+          await api.updateWeeklyPlan(data.id, {
+            dayOfWeek: newDay,
+            startTime: newTime
+          });
+          if (data.area === 'study') this.loadStudyWeeklyPlan();
+          else this.loadFootballWeeklyPlan();
+        } catch (error) {
+          alert('Failed to move item: ' + error.message);
+        }
+      });
     });
-  }
-
-  async deleteLog(id, area) {
-    if (!confirm('Delete this log entry?')) return;
-    try {
-      await api.deleteLog(id);
-      if (area === 'study') this.loadStudyEmbeddedLogs();
-      else this.loadFootballEmbeddedLogs();
-    } catch (error) {
-      alert(error.message);
-    }
   }
 
   // ==================== STATS ====================
@@ -1006,6 +1060,10 @@ class LogbookApp {
           <label>Duration (minutes)</label>
           <input type="number" id="weekly-plan-duration" class="form-input" value="45" min="5" max="480" required>
         </div>
+        <div class="form-group">
+          <label>Start Time (optional)</label>
+          <input type="time" id="weekly-plan-start-time" class="form-input" min="07:00" max="18:00" step="900">
+        </div>
         <button type="submit" class="btn btn-primary btn-block">Add to Weekly Plan</button>
       </form>
     `);
@@ -1021,7 +1079,8 @@ class LogbookApp {
           categoryId: selectedCatId,
           title: selectedCat ? selectedCat.name : 'Session',
           durationMinutes: parseInt(document.getElementById('weekly-plan-duration').value),
-          intensity: null
+          intensity: null,
+          startTime: document.getElementById('weekly-plan-start-time').value || null
         });
         this.closeModal();
         if (area === 'study') this.loadStudyWeeklyPlan();
@@ -1077,8 +1136,8 @@ class LogbookApp {
           notes: document.getElementById('log-notes').value || null
         });
         this.closeModal();
-        if (area === 'study') this.loadStudyEmbeddedLogs();
-        else this.loadFootballEmbeddedLogs();
+        if (area === 'study') this.loadStudyWeeklyPlan();
+        else this.loadFootballWeeklyPlan();
       } catch (error) {
         alert(error.message);
       }

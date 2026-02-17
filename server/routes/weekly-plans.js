@@ -56,6 +56,7 @@ router.get('/week-status', (req, res) => {
       SELECT
         w.id, w.area, w.day_of_week as dayOfWeek, w.category_id as categoryId,
         w.title, w.notes, w.duration_minutes as durationMinutes, w.intensity,
+        w.start_time as startTime,
         ${CATEGORY_JOIN_SELECT},
         l.id as completedLogId,
         l.date_time as completedAt
@@ -89,6 +90,7 @@ router.get('/week-status', (req, res) => {
       notes: item.notes,
       durationMinutes: item.durationMinutes,
       intensity: item.intensity,
+      startTime: item.startTime || null,
       isCompleted: !!item.completedLogId,
       completedLogId: item.completedLogId || null,
       completedAt: item.completedAt || null
@@ -110,6 +112,7 @@ router.get('/', (req, res) => {
       SELECT
         w.id, w.area, w.day_of_week as dayOfWeek, w.category_id as categoryId,
         w.title, w.notes, w.duration_minutes as durationMinutes, w.intensity,
+        w.start_time as startTime,
         w.created_at as createdAt, w.updated_at as updatedAt,
         ${CATEGORY_JOIN_SELECT}
       FROM weekly_plan_items w
@@ -136,7 +139,7 @@ router.get('/', (req, res) => {
 // POST /api/weekly-plans
 router.post('/', (req, res) => {
   try {
-    const { area, dayOfWeek, categoryId, title, durationMinutes, intensity, notes } = req.body;
+    const { area, dayOfWeek, categoryId, title, durationMinutes, intensity, notes, startTime } = req.body;
 
     if (!area || dayOfWeek === undefined || !categoryId || !title) {
       return res.status(400).json({ error: 'area, dayOfWeek, categoryId, and title are required' });
@@ -155,14 +158,15 @@ router.post('/', (req, res) => {
     }
 
     const result = db.prepare(`
-      INSERT INTO weekly_plan_items (user_id, area, day_of_week, category_id, title, notes, duration_minutes, intensity)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(req.user.id, area, dayOfWeek, categoryId, title, notes || null, durationMinutes || 45, intensity || null);
+      INSERT INTO weekly_plan_items (user_id, area, day_of_week, category_id, title, notes, duration_minutes, intensity, start_time)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(req.user.id, area, dayOfWeek, categoryId, title, notes || null, durationMinutes || 45, intensity || null, startTime || null);
 
     const item = db.prepare(`
       SELECT
         w.id, w.area, w.day_of_week as dayOfWeek, w.category_id as categoryId,
         w.title, w.notes, w.duration_minutes as durationMinutes, w.intensity,
+        w.start_time as startTime,
         w.created_at as createdAt, w.updated_at as updatedAt,
         ${CATEGORY_JOIN_SELECT}
       FROM weekly_plan_items w
@@ -181,7 +185,7 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { dayOfWeek, categoryId, title, durationMinutes, intensity, notes } = req.body;
+    const { dayOfWeek, categoryId, title, durationMinutes, intensity, notes, startTime } = req.body;
 
     const existing = db.prepare('SELECT * FROM weekly_plan_items WHERE id = ? AND user_id = ? AND is_active = 1').get(id, req.user.id);
     if (!existing) {
@@ -190,7 +194,7 @@ router.put('/:id', (req, res) => {
 
     db.prepare(`
       UPDATE weekly_plan_items
-      SET day_of_week = ?, category_id = ?, title = ?, notes = ?, duration_minutes = ?, intensity = ?, updated_at = CURRENT_TIMESTAMP
+      SET day_of_week = ?, category_id = ?, title = ?, notes = ?, duration_minutes = ?, intensity = ?, start_time = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
     `).run(
       dayOfWeek !== undefined ? dayOfWeek : existing.day_of_week,
@@ -199,6 +203,7 @@ router.put('/:id', (req, res) => {
       notes !== undefined ? notes : existing.notes,
       durationMinutes ?? existing.duration_minutes,
       intensity !== undefined ? intensity : existing.intensity,
+      startTime !== undefined ? startTime : existing.start_time,
       id,
       req.user.id
     );
@@ -207,6 +212,7 @@ router.put('/:id', (req, res) => {
       SELECT
         w.id, w.area, w.day_of_week as dayOfWeek, w.category_id as categoryId,
         w.title, w.notes, w.duration_minutes as durationMinutes, w.intensity,
+        w.start_time as startTime,
         w.created_at as createdAt, w.updated_at as updatedAt,
         ${CATEGORY_JOIN_SELECT}
       FROM weekly_plan_items w

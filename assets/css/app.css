@@ -1513,6 +1513,182 @@ body {
   opacity: 0.5;
 }
 
+/* ==================== TIMETABLE ==================== */
+.timetable-container {
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.timetable-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.timetable-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.timetable-grid {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 600px;
+  position: relative;
+}
+
+.timetable-time-column {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--card-bg);
+  border-right: 1px solid var(--border-color);
+}
+
+.timetable-hour-label {
+  height: 100px;
+  padding: 0.25rem 0.375rem;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: flex-start;
+}
+
+.timetable-day-column {
+  border-right: 1px solid var(--border-color);
+  min-width: 90px;
+}
+
+.timetable-day-column:last-child {
+  border-right: none;
+}
+
+.timetable-day-header {
+  text-align: center;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  background: var(--card-bg);
+  z-index: 1;
+}
+
+.timetable-day-column.today .timetable-day-header {
+  background: var(--primary-color);
+  color: white;
+}
+
+.timetable-day-slots {
+  position: relative;
+}
+
+.timetable-slot {
+  height: 25px;
+  border-bottom: 1px solid transparent;
+  transition: background 0.15s ease;
+}
+
+.timetable-slot.hour-boundary {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.timetable-slot.drag-over {
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.timetable-block {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 4px;
+  padding: 0.25rem 0.375rem;
+  color: white;
+  font-size: 0.7rem;
+  overflow: hidden;
+  cursor: grab;
+  z-index: 3;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.timetable-block:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  z-index: 4;
+}
+
+.timetable-block.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.timetable-block.completed {
+  opacity: 0.6;
+}
+
+.timetable-block-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timetable-block-time {
+  font-weight: 400;
+  opacity: 0.85;
+  font-size: 0.6rem;
+}
+
+.timetable-block-duration {
+  font-weight: 400;
+  opacity: 0.85;
+  font-size: 0.6rem;
+}
+
+.timetable-unscheduled {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.timetable-unscheduled:empty {
+  display: none;
+}
+
+.timetable-unscheduled h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.unscheduled-items-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.timetable-block.unscheduled {
+  position: relative;
+  display: inline-flex;
+  flex-direction: row;
+  gap: 0.375rem;
+  align-items: center;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  cursor: grab;
+}
+
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1200px) {
   .week-grid {
