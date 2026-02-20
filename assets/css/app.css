@@ -1689,6 +1689,310 @@ body {
   cursor: grab;
 }
 
+/* ==================== FOOTBALL SCORING DASHBOARD ==================== */
+
+.scoring-dashboard {
+  padding: 1.25rem 1.5rem;
+}
+
+.scoring-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.scoring-title-block {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.scoring-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.scoring-grand-total {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+/* Attribute cards grid */
+.scoring-totals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.scoring-attr-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+  transition: border-color 0.2s;
+}
+
+.scoring-attr-card.met {
+  border-color: #10b981;
+}
+
+.scoring-attr-card.unmet {
+  border-color: #f59e0b;
+}
+
+.scoring-attr-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.scoring-attr-icon {
+  font-size: 0.9rem;
+}
+
+.scoring-attr-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.scoring-attr-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: white;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+
+.scoring-progress-bar {
+  height: 5px;
+  background: var(--border-color);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 0.3rem;
+}
+
+.scoring-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.scoring-attr-meta {
+  font-size: 0.65rem;
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+/* Section label */
+.scoring-section-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin: 0 0 0.5rem 0;
+}
+
+/* Session summary chips */
+.scoring-session-summary {
+  margin-bottom: 1.25rem;
+}
+
+.scoring-session-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.session-chip {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.session-chip.team-match {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: #22c55e;
+  color: #16a34a;
+}
+
+/* Warnings */
+.scoring-warnings {
+  margin-top: 0.25rem;
+}
+
+.scoring-warn-label {
+  color: #d97706;
+}
+
+.scoring-all-met {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  padding: 0.5rem 0.875rem;
+}
+
+.scoring-check {
+  font-size: 1rem;
+}
+
+.scoring-warnings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.scoring-warning-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  background: rgba(245, 158, 11, 0.07);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+}
+
+.warn-icon {
+  font-size: 0.85rem;
+}
+
+.warn-attr {
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 70px;
+}
+
+.warn-val {
+  color: #d97706;
+  font-weight: 600;
+}
+
+.warn-shortfall {
+  color: var(--text-secondary);
+}
+
+.warn-suggestion {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Rules editing panel */
+.scoring-rules-panel {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.scoring-rules-table-wrapper {
+  overflow-x: auto;
+}
+
+.scoring-rules-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.scoring-rules-table th,
+.scoring-rules-table td {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.scoring-rules-table th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rule-session-name {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.rule-input {
+  width: 48px;
+  text-align: center;
+  padding: 0.2rem 0.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.rule-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.scoring-targets-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.target-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.target-edit-row label {
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 70px;
+}
+
+.target-input {
+  width: 56px;
+  text-align: center;
+  padding: 0.2rem 0.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.target-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1200px) {
   .week-grid {

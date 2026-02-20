@@ -539,9 +539,16 @@ class LogbookApp {
       const { items } = await api.getWeeklyPlanStatus(weekStart, 'football');
       this.renderWeeklyPlanGrid('football-weekly-plan-grid', items, 'football');
       this.updateWeeklyProgress(items, 'football');
-      this.renderTimetable('football', items);
+      this.renderFootballScoring(items);
     } catch (error) {
       console.error('Failed to load football weekly plan:', error);
+    }
+  }
+
+  renderFootballScoring(items) {
+    const container = document.getElementById('football-scoring-container');
+    if (container && typeof FootballScoring !== 'undefined') {
+      FootballScoring.renderScoringDashboard(container, items);
     }
   }
 
