@@ -62,9 +62,14 @@ router.get('/week-status', (req, res) => {
         l.date_time as completedAt
       FROM weekly_plan_items w
       ${CATEGORY_JOIN_FROM}
-      LEFT JOIN log_entries l ON l.weekly_plan_item_id = w.id
-        AND DATE(l.date_time) >= ? AND DATE(l.date_time) <= ?
-        AND l.user_id = ?
+      LEFT JOIN log_entries l ON l.id = (
+        SELECT id FROM log_entries
+        WHERE weekly_plan_item_id = w.id
+          AND DATE(date_time) >= ? AND DATE(date_time) <= ?
+          AND user_id = ?
+        ORDER BY date_time DESC
+        LIMIT 1
+      )
       WHERE w.user_id = ? AND w.is_active = 1
     `;
     const params = [weekStart, weekEnd, req.user.id, req.user.id];
@@ -353,16 +358,10 @@ router.post('/:id/uncomplete', (req, res) => {
     const weekStart = getWeekStart(new Date());
     const weekEnd = getWeekEnd(weekStart);
 
-    const logEntry = db.prepare(`
-      SELECT id FROM log_entries
+    db.prepare(`
+      DELETE FROM log_entries
       WHERE weekly_plan_item_id = ? AND user_id = ? AND DATE(date_time) >= ? AND DATE(date_time) <= ?
-    `).get(id, req.user.id, weekStart, weekEnd);
-
-    if (!logEntry) {
-      return res.json({ message: 'Already uncompleted' });
-    }
-
-    db.prepare('DELETE FROM log_entries WHERE id = ?').run(logEntry.id);
+    `).run(id, req.user.id, weekStart, weekEnd);
     res.json({ message: 'Uncompleted' });
   } catch (error) {
     console.error('Uncomplete weekly plan error:', error);
