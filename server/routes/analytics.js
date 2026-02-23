@@ -216,6 +216,88 @@ router.get('/monthly', (req, res) => {
   }
 });
 
+// Get daily stats for a specific date
+router.get('/daily', (req, res) => {
+  try {
+    const { date, area } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    // Totals for the day
+    let totalsQuery = `
+      SELECT
+        area,
+        SUM(duration_minutes) as totalMinutes,
+        COUNT(*) as totalSessions
+      FROM log_entries
+      WHERE user_id = ? AND DATE(date_time) = ?
+    `;
+    const totalsParams = [req.user.id, targetDate];
+    if (area && ['study', 'football'].includes(area)) {
+      totalsQuery += ' AND area = ?';
+      totalsParams.push(area);
+    }
+    totalsQuery += ' GROUP BY area';
+    const totals = db.prepare(totalsQuery).all(...totalsParams);
+
+    // Breakdown by category for football
+    const footballBreakdown = (!area || area === 'football') ? db.prepare(`
+      SELECT
+        l.category_id as categoryId,
+        fc.name as categoryName,
+        fc.color as categoryColor,
+        fc.type as categoryType,
+        SUM(l.duration_minutes) as totalMinutes,
+        COUNT(*) as sessions
+      FROM log_entries l
+      JOIN football_categories fc ON l.category_id = fc.id
+      WHERE l.user_id = ? AND l.area = 'football' AND DATE(l.date_time) = ?
+      GROUP BY l.category_id
+      ORDER BY totalMinutes DESC
+    `).all(req.user.id, targetDate) : [];
+
+    // Individual log entries for the day
+    let logsQuery = `
+      SELECT
+        l.id, l.area, l.date_time as dateTime, l.duration_minutes as durationMinutes,
+        l.title, l.intensity,
+        CASE WHEN l.area = 'study' THEN sc.name WHEN l.area = 'football' THEN fc.name END as categoryName,
+        CASE WHEN l.area = 'study' THEN sc.color WHEN l.area = 'football' THEN fc.color END as categoryColor
+      FROM log_entries l
+      LEFT JOIN study_categories sc ON l.category_id = sc.id AND l.area = 'study'
+      LEFT JOIN football_categories fc ON l.category_id = fc.id AND l.area = 'football'
+      WHERE l.user_id = ? AND DATE(l.date_time) = ?
+    `;
+    const logsParams = [req.user.id, targetDate];
+    if (area && ['study', 'football'].includes(area)) {
+      logsQuery += ' AND l.area = ?';
+      logsParams.push(area);
+    }
+    logsQuery += ' ORDER BY l.date_time DESC';
+    const logs = db.prepare(logsQuery).all(...logsParams);
+
+    const footballTotal = totals.find(t => t.area === 'football') || { totalMinutes: 0, totalSessions: 0 };
+    const studyTotal = totals.find(t => t.area === 'study') || { totalMinutes: 0, totalSessions: 0 };
+
+    res.json({
+      date: targetDate,
+      football: {
+        totalMinutes: footballTotal.totalMinutes || 0,
+        totalSessions: footballTotal.totalSessions || 0,
+        breakdown: footballBreakdown
+      },
+      study: {
+        totalMinutes: studyTotal.totalMinutes || 0,
+        totalSessions: studyTotal.totalSessions || 0,
+        breakdown: []
+      },
+      logs
+    });
+  } catch (error) {
+    console.error('Get daily stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch daily stats' });
+  }
+});
+
 // Get dashboard summary (today + this week)
 router.get('/dashboard', (req, res) => {
   try {

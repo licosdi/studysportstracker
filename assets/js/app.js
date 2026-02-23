@@ -9,7 +9,7 @@ class LogbookApp {
     // Per-area stats state
     this.studyStatsMode = 'weekly';
     this.studyStatsDate = new Date();
-    this.footballStatsMode = 'weekly';
+    this.footballStatsMode = 'daily';
     this.footballStatsDate = new Date();
 
     // Timer state
@@ -534,9 +534,13 @@ class LogbookApp {
   }
 
   async loadFootballWeeklyPlan() {
-    const weekStart = this.formatDate(this.getWeekStart(new Date()));
+    const weekStart = this.getWeekStart(new Date());
+    const weekStartStr = this.formatDate(weekStart);
+    // Show week range in header
+    const weekLabel = document.getElementById('football-week-label');
+    if (weekLabel) weekLabel.textContent = this.formatWeekDisplay(weekStart);
     try {
-      const { items } = await api.getWeeklyPlanStatus(weekStart, 'football');
+      const { items } = await api.getWeeklyPlanStatus(weekStartStr, 'football');
       this.renderWeeklyPlanGrid('football-weekly-plan-grid', items, 'football');
       this.updateWeeklyProgress(items, 'football');
       this.renderFootballScoring(items);
@@ -567,11 +571,12 @@ class LogbookApp {
           <div class="day-header">
             <span class="day-name">${days[i]}</span>
           </div>
-          <div class="day-items">
+          <div class="day-items" data-day="${i}" data-area="${area}">
             ${dayItems.map(item => {
               const isCompleted = !!item.isCompleted;
               return `
-                <div class="plan-item ${isCompleted ? 'completed' : ''}" data-id="${item.id}">
+                <div class="plan-item ${isCompleted ? 'completed' : ''}" data-id="${item.id}" draggable="true">
+                  <span class="drag-handle" title="Drag to reorder">&#9776;</span>
                   <label class="plan-checkbox">
                     <input type="checkbox" ${isCompleted ? 'checked' : ''} data-weekly-id="${item.id}">
                   </label>
@@ -613,6 +618,75 @@ class LogbookApp {
     container.querySelectorAll('.add-day-item-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         this.openWeeklyPlanModal(btn.dataset.area, parseInt(btn.dataset.day));
+      });
+    });
+
+    // Drag-and-drop reordering within each day column
+    this.setupDragAndDrop(container, area);
+  }
+
+  setupDragAndDrop(container, area) {
+    let draggedEl = null;
+
+    container.querySelectorAll('.day-items').forEach(dayList => {
+      dayList.addEventListener('dragstart', (e) => {
+        const item = e.target.closest('.plan-item');
+        if (!item) return;
+        draggedEl = item;
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', item.dataset.id);
+      });
+
+      dayList.addEventListener('dragend', (e) => {
+        const item = e.target.closest('.plan-item');
+        if (item) item.classList.remove('dragging');
+        container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+        draggedEl = null;
+      });
+
+      dayList.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const target = e.target.closest('.plan-item');
+        if (!target || target === draggedEl) return;
+        // Only allow reorder within same day
+        if (target.closest('.day-items') !== draggedEl?.closest('.day-items')) return;
+        container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+        target.classList.add('drag-over');
+      });
+
+      dayList.addEventListener('dragleave', (e) => {
+        const target = e.target.closest('.plan-item');
+        if (target) target.classList.remove('drag-over');
+      });
+
+      dayList.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (!draggedEl) return;
+        const target = e.target.closest('.plan-item');
+        if (!target || target === draggedEl) return;
+        if (target.closest('.day-items') !== draggedEl.closest('.day-items')) return;
+
+        const list = draggedEl.closest('.day-items');
+        const allItems = [...list.querySelectorAll('.plan-item')];
+        const dragIdx = allItems.indexOf(draggedEl);
+        const targetIdx = allItems.indexOf(target);
+
+        if (dragIdx < targetIdx) {
+          list.insertBefore(draggedEl, target.nextSibling);
+        } else {
+          list.insertBefore(draggedEl, target);
+        }
+
+        target.classList.remove('drag-over');
+
+        // Persist new order
+        const reordered = [...list.querySelectorAll('.plan-item')].map((el, idx) => ({
+          id: parseInt(el.dataset.id),
+          sortOrder: idx
+        }));
+        api.reorderWeeklyPlans(reordered).catch(err => console.error('Reorder failed', err));
       });
     });
   }
@@ -895,26 +969,150 @@ class LogbookApp {
   }
 
   async loadFootballStats() {
-    if (this.footballStatsMode === 'weekly') {
-      const weekStart = this.getWeekStart(this.footballStatsDate);
-      document.getElementById('football-stats-period-display').textContent = this.formatWeekDisplay(weekStart);
-      try {
+    const display = document.getElementById('football-stats-period-display');
+    const sessionsCard = document.getElementById('football-sessions-card');
+    const chartTitle = document.getElementById('football-chart-title');
+
+    try {
+      if (this.footballStatsMode === 'daily') {
+        const dateStr = this.formatDate(this.footballStatsDate);
+        display.textContent = this.footballStatsDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        if (chartTitle) chartTitle.textContent = 'Session Log';
+        if (sessionsCard) sessionsCard.style.display = '';
+        const data = await api.getDailyStats(dateStr, 'football');
+        this.renderFootballStatsDaily(data);
+      } else if (this.footballStatsMode === 'weekly') {
+        const weekStart = this.getWeekStart(this.footballStatsDate);
+        display.textContent = this.formatWeekDisplay(weekStart);
+        if (chartTitle) chartTitle.textContent = 'Daily Breakdown';
+        if (sessionsCard) sessionsCard.style.display = 'none';
         const data = await api.getWeeklyStats(this.formatDate(weekStart), 'football');
-        this.renderAreaStats('football', data);
-      } catch (error) {
-        console.error('Failed to load football stats:', error);
-      }
-    } else {
-      const year = this.footballStatsDate.getFullYear();
-      const month = this.footballStatsDate.getMonth() + 1;
-      document.getElementById('football-stats-period-display').textContent =
-        this.footballStatsDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      try {
+        this.renderFootballStatsWeekly(data);
+      } else {
+        const year = this.footballStatsDate.getFullYear();
+        const month = this.footballStatsDate.getMonth() + 1;
+        display.textContent = this.footballStatsDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        if (chartTitle) chartTitle.textContent = 'Weekly Breakdown';
+        if (sessionsCard) sessionsCard.style.display = 'none';
         const data = await api.getMonthlyStats(year, month, 'football');
-        this.renderAreaStats('football', data);
-      } catch (error) {
-        console.error('Failed to load football stats:', error);
+        this.renderFootballStatsMonthly(data);
       }
+    } catch (error) {
+      console.error('Failed to load football stats:', error);
+    }
+  }
+
+  renderFootballStatsDaily(data) {
+    const football = data.football || { totalMinutes: 0, totalSessions: 0, breakdown: [] };
+    this._renderFootballStatsSummary(football);
+
+    // Chart: show individual log entries as bars
+    const chartContainer = document.getElementById('football-daily-chart');
+    const logs = data.logs || [];
+    if (logs.length > 0) {
+      const maxMinutes = Math.max(...logs.map(l => l.durationMinutes), 30);
+      chartContainer.innerHTML = `
+        <div class="bar-chart">
+          ${logs.map(l => `
+            <div class="bar-group">
+              <div class="bar" style="height: ${(l.durationMinutes / maxMinutes * 100)}%; background: ${l.categoryColor || '#10b981'}" title="${l.categoryName}: ${l.durationMinutes}m"></div>
+              <div class="bar-label">${l.categoryName ? l.categoryName.substring(0, 4) : ''}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      chartContainer.innerHTML = '<p class="empty-state">No sessions today</p>';
+    }
+
+    // Session list
+    const sessionsList = document.getElementById('football-sessions-list');
+    if (sessionsList) {
+      if (logs.length > 0) {
+        sessionsList.innerHTML = logs.map(l => `
+          <div class="session-log-item">
+            <span class="session-log-badge" style="background: ${l.categoryColor || '#10b981'}">${l.categoryName || ''}</span>
+            <span class="session-log-duration">${l.durationMinutes}m</span>
+            <span class="session-log-time">${new Date(l.dateTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+            ${l.intensity ? `<span class="session-log-intensity intensity-${l.intensity}">${l.intensity}</span>` : ''}
+          </div>
+        `).join('');
+      } else {
+        sessionsList.innerHTML = '<p class="empty-state">No sessions logged</p>';
+      }
+    }
+  }
+
+  renderFootballStatsWeekly(data) {
+    const football = data.football || { totalMinutes: 0, totalSessions: 0, breakdown: [] };
+    this._renderFootballStatsSummary(football);
+
+    // Bar chart: daily breakdown
+    const chartContainer = document.getElementById('football-daily-chart');
+    const dailyData = (data.daily || []).filter(d => d.area === 'football');
+    if (dailyData.length > 0) {
+      const maxMinutes = Math.max(...dailyData.map(d => d.totalMinutes), 60);
+      chartContainer.innerHTML = `
+        <div class="bar-chart">
+          ${dailyData.map(d => `
+            <div class="bar-group">
+              <div class="bar" style="height: ${(d.totalMinutes / maxMinutes * 100)}%; background: #10b981" title="${d.date}: ${d.totalMinutes}m"></div>
+              <div class="bar-label">${new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      chartContainer.innerHTML = '<p class="empty-state">No data for this week</p>';
+    }
+  }
+
+  renderFootballStatsMonthly(data) {
+    const football = data.football || { totalMinutes: 0, totalSessions: 0, breakdown: [] };
+    this._renderFootballStatsSummary(football);
+
+    // Bar chart: weekly breakdown within month
+    const chartContainer = document.getElementById('football-daily-chart');
+    const weeklyData = (data.weekly || []).filter(d => d.area === 'football');
+    if (weeklyData.length > 0) {
+      const maxMinutes = Math.max(...weeklyData.map(d => d.totalMinutes), 60);
+      chartContainer.innerHTML = `
+        <div class="bar-chart">
+          ${weeklyData.map((d, i) => `
+            <div class="bar-group">
+              <div class="bar" style="height: ${(d.totalMinutes / maxMinutes * 100)}%; background: #10b981" title="Week ${d.weekNumber}: ${d.totalMinutes}m"></div>
+              <div class="bar-label">Wk ${i + 1}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      chartContainer.innerHTML = '<p class="empty-state">No data for this month</p>';
+    }
+  }
+
+  _renderFootballStatsSummary(football) {
+    document.getElementById('football-stats-time').textContent = this.formatDuration(football.totalMinutes);
+    document.getElementById('football-stats-sessions').textContent = football.totalSessions;
+    const avg = football.totalSessions > 0 ? Math.round(football.totalMinutes / football.totalSessions) : 0;
+    document.getElementById('football-stats-avg').textContent = avg > 0 ? `${avg}m` : '—';
+
+    const breakdownEl = document.getElementById('football-stats-breakdown');
+    if (football.breakdown && football.breakdown.length > 0) {
+      breakdownEl.innerHTML = football.breakdown.map(cat => `
+        <div class="breakdown-item">
+          <div class="breakdown-label">
+            <span class="breakdown-color" style="background: ${cat.categoryColor}"></span>
+            ${cat.categoryName}
+          </div>
+          <div class="breakdown-value">${this.formatDuration(cat.totalMinutes)}</div>
+          <div class="breakdown-bar">
+            <div class="breakdown-bar-fill" style="width: ${(cat.totalMinutes / (football.totalMinutes || 1) * 100) || 0}%; background: ${cat.categoryColor}"></div>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      breakdownEl.innerHTML = '<p class="empty-state">No data</p>';
     }
   }
 
@@ -927,7 +1125,9 @@ class LogbookApp {
   }
 
   changeFootballStatsPeriod(delta) {
-    if (this.footballStatsMode === 'weekly') {
+    if (this.footballStatsMode === 'daily') {
+      this.footballStatsDate.setDate(this.footballStatsDate.getDate() + delta);
+    } else if (this.footballStatsMode === 'weekly') {
       this.footballStatsDate.setDate(this.footballStatsDate.getDate() + (delta * 7));
     } else {
       this.footballStatsDate.setMonth(this.footballStatsDate.getMonth() + delta);

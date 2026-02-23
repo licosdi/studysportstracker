@@ -394,6 +394,13 @@ body {
   text-align: center;
 }
 
+.week-label-sub {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-top: 0.15rem;
+}
+
 /* ==================== DASHBOARD ==================== */
 .dashboard-grid {
   display: grid;
@@ -767,6 +774,80 @@ body {
   font-weight: 600;
   color: var(--text-primary);
 }
+
+/* Stats summary grid (daily/weekly/monthly) */
+.stats-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.stats-summary-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  text-align: center;
+}
+
+.stats-summary-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+}
+
+.stats-summary-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Session log items (daily stats view) */
+.session-log-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.85rem;
+}
+
+.session-log-item:last-child {
+  border-bottom: none;
+}
+
+.session-log-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.session-log-duration {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.session-log-time {
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.session-log-intensity {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  text-transform: capitalize;
+}
+
+.intensity-low { background: rgba(16,185,129,0.12); color: #059669; }
+.intensity-medium { background: rgba(245,158,11,0.12); color: #d97706; }
+.intensity-high { background: rgba(239,68,68,0.12); color: #dc2626; }
 
 /* Chart Container */
 .chart-container {
@@ -1205,6 +1286,31 @@ body {
 .weekly-plan-grid .plan-item {
   font-size: 0.85rem;
   padding: 0.5rem;
+}
+
+/* Drag handle */
+.drag-handle {
+  cursor: grab;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 0 0.2rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.plan-item:hover .drag-handle {
+  opacity: 0.5;
+}
+
+.plan-item.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.plan-item.drag-over {
+  border-top: 2px solid var(--primary-color);
 }
 
 .plan-item-title {

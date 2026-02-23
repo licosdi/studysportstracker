@@ -192,10 +192,20 @@ class API {
     return await this.request('GET', `/api/weekly-plans/week-status?${query}`);
   }
 
+  async reorderWeeklyPlans(items) {
+    return await this.request('POST', '/api/weekly-plans/reorder', { items });
+  }
+
   // ==================== ANALYTICS ====================
 
   async getDashboard() {
     return await this.request('GET', '/api/analytics/dashboard');
+  }
+
+  async getDailyStats(date, area = null) {
+    let url = `/api/analytics/daily?date=${date}`;
+    if (area) url += `&area=${area}`;
+    return await this.request('GET', url);
   }
 
   async getWeeklyStats(weekStart, area = null) {

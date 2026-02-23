@@ -293,7 +293,10 @@
         <!-- Football Weekly Plan View -->
         <section id="football-weekly-plan-view" class="view">
           <div class="view-header">
-            <h2>Football Weekly Training Plan</h2>
+            <div>
+              <h2>Football Weekly Training Plan</h2>
+              <span id="football-week-label" class="week-label-sub"></span>
+            </div>
             <div class="view-actions">
               <button class="btn btn-primary" id="add-football-weekly-plan-btn">+ Add to Plan</button>
             </div>
@@ -320,7 +323,8 @@
             <h2>Football Stats</h2>
             <div class="view-actions">
               <div class="btn-group">
-                <button class="btn btn-secondary active" data-stats-period="weekly" data-stats-area="football">Weekly</button>
+                <button class="btn btn-secondary active" data-stats-period="daily" data-stats-area="football">Daily</button>
+                <button class="btn btn-secondary" data-stats-period="weekly" data-stats-area="football">Weekly</button>
                 <button class="btn btn-secondary" data-stats-period="monthly" data-stats-area="football">Monthly</button>
               </div>
               <button class="btn btn-ghost" id="football-stats-prev">&larr;</button>
@@ -328,20 +332,44 @@
               <button class="btn btn-ghost" id="football-stats-next">&rarr;</button>
             </div>
           </div>
-          <div class="analytics-card">
-            <h3>Football</h3>
-            <div class="analytics-total">
-              <span id="football-stats-time">0h 0m</span>
-              <span class="analytics-sessions">(<span id="football-stats-sessions">0</span> sessions)</span>
+
+          <!-- Summary cards -->
+          <div class="stats-summary-grid" id="football-stats-summary-grid">
+            <div class="stats-summary-card">
+              <div class="stats-summary-label">Total Time</div>
+              <div class="stats-summary-value" id="football-stats-time">0h 0m</div>
             </div>
-            <div class="analytics-breakdown" id="football-stats-breakdown">
+            <div class="stats-summary-card">
+              <div class="stats-summary-label">Sessions</div>
+              <div class="stats-summary-value" id="football-stats-sessions">0</div>
+            </div>
+            <div class="stats-summary-card">
+              <div class="stats-summary-label">Avg / Session</div>
+              <div class="stats-summary-value" id="football-stats-avg">0m</div>
             </div>
           </div>
-          <div class="card" style="margin-top: 1.5rem;">
-            <div class="card-header"><h3>Daily Breakdown</h3></div>
+
+          <!-- Category breakdown -->
+          <div class="card" style="margin-top: 1.25rem;">
+            <div class="card-header"><h3>By Category</h3></div>
             <div class="card-body">
-              <div class="chart-container" id="football-daily-chart">
-              </div>
+              <div class="analytics-breakdown" id="football-stats-breakdown"></div>
+            </div>
+          </div>
+
+          <!-- Chart (daily bar chart / weekly bar chart / monthly weekly breakdown) -->
+          <div class="card" style="margin-top: 1.25rem;" id="football-chart-card">
+            <div class="card-header"><h3 id="football-chart-title">Sessions</h3></div>
+            <div class="card-body">
+              <div id="football-daily-chart"></div>
+            </div>
+          </div>
+
+          <!-- Session log list (daily view only) -->
+          <div class="card" style="margin-top: 1.25rem;" id="football-sessions-card">
+            <div class="card-header"><h3>Sessions</h3></div>
+            <div class="card-body">
+              <div id="football-sessions-list"></div>
             </div>
           </div>
         </section>

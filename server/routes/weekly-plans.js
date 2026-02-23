@@ -74,7 +74,7 @@ router.get('/week-status', (req, res) => {
       params.push(area);
     }
 
-    query += ' ORDER BY w.day_of_week ASC, w.created_at ASC';
+    query += ' ORDER BY w.day_of_week ASC, w.sort_order ASC, w.created_at ASC';
 
     const items = db.prepare(query).all(...params);
 
@@ -91,6 +91,7 @@ router.get('/week-status', (req, res) => {
       durationMinutes: item.durationMinutes,
       intensity: item.intensity,
       startTime: item.startTime || null,
+      sortOrder: item.sortOrder || 0,
       isCompleted: !!item.completedLogId,
       completedLogId: item.completedLogId || null,
       completedAt: item.completedAt || null
@@ -126,13 +127,41 @@ router.get('/', (req, res) => {
       params.push(area);
     }
 
-    query += ' ORDER BY w.day_of_week ASC, w.created_at ASC';
+    query += ' ORDER BY w.day_of_week ASC, w.sort_order ASC, w.created_at ASC';
 
     const items = db.prepare(query).all(...params);
     res.json({ items });
   } catch (error) {
     console.error('Get weekly plans error:', error);
     res.status(500).json({ error: 'Failed to fetch weekly plans' });
+  }
+});
+
+// POST /api/weekly-plans/reorder
+// Body: { items: [{ id, sortOrder }] }
+router.post('/reorder', (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items array is required' });
+    }
+
+    const update = db.prepare(`
+      UPDATE weekly_plan_items SET sort_order = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
+    `);
+
+    const updateMany = db.transaction((rows) => {
+      for (const row of rows) {
+        update.run(row.sortOrder, row.id, req.user.id);
+      }
+    });
+
+    updateMany(items);
+    res.json({ message: 'Reordered' });
+  } catch (error) {
+    console.error('Reorder weekly plan error:', error);
+    res.status(500).json({ error: 'Failed to reorder weekly plan items' });
   }
 });
 

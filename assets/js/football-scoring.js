@@ -186,24 +186,6 @@ const FootballScoring = (() => {
           </div>
         </div>
 
-        <!-- Warnings -->
-        <div class="scoring-warnings" id="scoring-warnings">
-          ${warnings.length === 0
-            ? `<div class="scoring-all-met"><span class="scoring-check">✓</span> All weekly targets met!</div>`
-            : `<h4 class="scoring-section-label scoring-warn-label">Targets Below Minimum</h4>
-               <ul class="scoring-warnings-list">
-                 ${warnings.map(w => `
-                   <li class="scoring-warning-item">
-                     <span class="warn-icon">⚠</span>
-                     <span class="warn-attr">${w.attribute}</span>
-                     <span class="warn-val">${w.current}/${w.target} pts</span>
-                     <span class="warn-shortfall">(${w.shortfall} short)</span>
-                     <span class="warn-suggestion">→ Add: ${w.suggestion}</span>
-                   </li>
-                 `).join('')}
-               </ul>`
-          }
-        </div>
 
         <!-- Editable rules panel (hidden by default) -->
         <div class="scoring-rules-panel" id="scoring-rules-panel" style="display:none;">

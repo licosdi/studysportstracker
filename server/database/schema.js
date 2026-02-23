@@ -113,6 +113,13 @@ export const createTables = (db) => {
     // Column already exists, ignore
   }
 
+  // Add sort_order column to weekly_plan_items (for drag-and-drop reordering)
+  try {
+    db.exec(`ALTER TABLE weekly_plan_items ADD COLUMN sort_order INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   // Create indexes for better query performance
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_study_categories_user ON study_categories(user_id);
