@@ -715,13 +715,11 @@ class LogbookApp {
   async uncompleteWeeklyPlan(id, area) {
     try {
       await api.uncompleteWeeklyPlan(id);
-      if (area === 'study') this.loadStudyWeeklyPlan();
-      else this.loadFootballWeeklyPlan();
     } catch (error) {
-      alert(error.message);
-      if (area === 'study') this.loadStudyWeeklyPlan();
-      else this.loadFootballWeeklyPlan();
+      // Ignore "Not completed this week" — just reload to sync correct state
     }
+    if (area === 'study') this.loadStudyWeeklyPlan();
+    else this.loadFootballWeeklyPlan();
   }
 
   async deleteWeeklyPlan(id, area) {

@@ -359,7 +359,7 @@ router.post('/:id/uncomplete', (req, res) => {
     `).get(id, req.user.id, weekStart, weekEnd);
 
     if (!logEntry) {
-      return res.status(400).json({ error: 'Not completed this week' });
+      return res.json({ message: 'Already uncompleted' });
     }
 
     db.prepare('DELETE FROM log_entries WHERE id = ?').run(logEntry.id);
