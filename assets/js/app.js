@@ -116,7 +116,7 @@ class LogbookApp {
       this.showMainApp();
       await this.loadInitialData();
     } catch (error) {
-      alert(error.message);
+      console.error('Login error:', error.message);
     }
   }
 
@@ -132,7 +132,7 @@ class LogbookApp {
       this.showMainApp();
       await this.loadInitialData();
     } catch (error) {
-      alert(error.message);
+      console.error('Signup error:', error.message);
     }
   }
 
@@ -381,7 +381,6 @@ class LogbookApp {
     const categorySelect = document.getElementById(`${area}-timer-category`);
 
     if (!categorySelect?.value) {
-      alert('Please select a category first.');
       return;
     }
 
@@ -479,7 +478,7 @@ class LogbookApp {
 
       await api.createLog(logData);
 
-      alert(`Great job! You completed ${timer.duration} minutes of ${category?.name || area}!`);
+      // Session saved silently
 
       timer.isBreak = true;
       document.getElementById(`${area}-break-section`).style.display = 'block';
@@ -491,7 +490,7 @@ class LogbookApp {
 
     } catch (error) {
       console.error('Failed to log session:', error);
-      alert('Session completed but failed to save. Please log manually.');
+      console.error('Failed to save session:', error);
     }
   }
 
@@ -516,7 +515,6 @@ class LogbookApp {
     const timer = this.timers[area];
     clearInterval(timer.interval);
     this.resetTimer(area);
-    alert('Break complete! Ready for the next session.');
   }
 
   // ==================== WEEKLY PLAN ====================
@@ -706,7 +704,7 @@ class LogbookApp {
       if (area === 'study') this.loadStudyWeeklyPlan();
       else this.loadFootballWeeklyPlan();
     } catch (error) {
-      alert(error.message);
+      console.error('Complete weekly plan error:', error);
       if (area === 'study') this.loadStudyWeeklyPlan();
       else this.loadFootballWeeklyPlan();
     }
@@ -723,13 +721,12 @@ class LogbookApp {
   }
 
   async deleteWeeklyPlan(id, area) {
-    if (!confirm('Remove this item from your weekly plan?')) return;
     try {
       await api.deleteWeeklyPlan(id);
       if (area === 'study') this.loadStudyWeeklyPlan();
       else this.loadFootballWeeklyPlan();
     } catch (error) {
-      alert(error.message);
+      console.error('Delete weekly plan error:', error);
     }
   }
 
@@ -873,7 +870,7 @@ class LogbookApp {
           if (data.area === 'study') this.loadStudyWeeklyPlan();
           else this.loadFootballWeeklyPlan();
         } catch (error) {
-          alert('Failed to move item: ' + error.message);
+          console.error('Failed to move item:', error);
         }
       });
     });
@@ -1193,7 +1190,7 @@ class LogbookApp {
       await this.loadCategories();
       this.renderStudyCategories();
     } catch (error) {
-      alert(error.message);
+      console.error('Toggle study category error:', error);
     }
   }
 
@@ -1203,29 +1200,27 @@ class LogbookApp {
       await this.loadCategories();
       this.renderFootballCategories();
     } catch (error) {
-      alert(error.message);
+      console.error('Toggle football category error:', error);
     }
   }
 
   async deleteStudyCategory(id) {
-    if (!confirm('Delete this category?')) return;
     try {
       await api.deleteStudyCategory(id);
       await this.loadCategories();
       this.renderStudyCategories();
     } catch (error) {
-      alert(error.message);
+      console.error('Delete study category error:', error);
     }
   }
 
   async deleteFootballCategory(id) {
-    if (!confirm('Delete this category?')) return;
     try {
       await api.deleteFootballCategory(id);
       await this.loadCategories();
       this.renderFootballCategories();
     } catch (error) {
-      alert(error.message);
+      console.error('Delete football category error:', error);
     }
   }
 
@@ -1302,7 +1297,6 @@ class LogbookApp {
           selectedDays = Array.from(document.querySelectorAll('input[name="weekly-plan-days"]:checked'))
             .map(cb => parseInt(cb.value));
           if (selectedDays.length === 0) {
-            alert('Please select at least one day.');
             return;
           }
         } else {
@@ -1325,7 +1319,7 @@ class LogbookApp {
         if (area === 'study') this.loadStudyWeeklyPlan();
         else this.loadFootballWeeklyPlan();
       } catch (error) {
-        alert(error.message);
+        console.error('Add weekly plan error:', error);
       }
     });
   }
@@ -1378,7 +1372,7 @@ class LogbookApp {
         if (area === 'study') this.loadStudyWeeklyPlan();
         else this.loadFootballWeeklyPlan();
       } catch (error) {
-        alert(error.message);
+        console.error('Add log error:', error);
       }
     });
   }
@@ -1431,7 +1425,7 @@ class LogbookApp {
         if (area === 'study') this.renderStudyCategories();
         else this.renderFootballCategories();
       } catch (error) {
-        alert(error.message);
+        console.error('Add category error:', error);
       }
     });
   }
