@@ -1056,19 +1056,28 @@ class LogbookApp {
     const football = data.football || { totalMinutes: 0, totalSessions: 0, breakdown: [] };
     this._renderFootballStatsSummary(football);
 
-    // Bar chart: daily breakdown
+    // Bar chart: stacked daily breakdown by category
     const chartContainer = document.getElementById('football-daily-chart');
     const dailyData = (data.daily || []).filter(d => d.area === 'football');
+    const dailyByCategory = data.dailyByCategory || [];
     if (dailyData.length > 0) {
       const maxMinutes = Math.max(...dailyData.map(d => d.totalMinutes), 60);
       chartContainer.innerHTML = `
         <div class="bar-chart">
-          ${dailyData.map(d => `
-            <div class="bar-group">
-              <div class="bar" style="height: ${(d.totalMinutes / maxMinutes * 100)}%; background: #10b981" title="${d.date}: ${d.totalMinutes}m"></div>
-              <div class="bar-label">${new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })}</div>
-            </div>
-          `).join('')}
+          ${dailyData.map(d => {
+            const cats = dailyByCategory.filter(c => c.date === d.date);
+            const segments = cats.map(c => `
+              <div style="height: ${(c.totalMinutes / maxMinutes * 100)}%; background: ${c.categoryColor}; width: 100%;" title="${c.categoryName}: ${c.totalMinutes}m"></div>
+            `).join('');
+            return `
+              <div class="bar-group">
+                <div class="bar stacked" style="height: ${(d.totalMinutes / maxMinutes * 100)}%;">
+                  ${segments}
+                </div>
+                <div class="bar-label">${new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })}</div>
+              </div>
+            `;
+          }).join('')}
         </div>
       `;
     } else {

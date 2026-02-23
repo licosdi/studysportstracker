@@ -155,7 +155,6 @@ export const seedDefaultCategories = (db, userId) => {
     { name: 'Team Training', type: 'team', color: '#22c55e' },
     { name: 'Strength', type: 'strength', color: '#ef4444' },
     { name: 'Endurance', type: 'endurance', color: '#f97316' },
-    { name: 'Ball Work', type: 'ball', color: '#3b82f6' },
     { name: 'Recovery', type: 'recovery', color: '#a855f7' }
   ];
 

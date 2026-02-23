@@ -88,6 +88,21 @@ router.get('/weekly', (req, res) => {
     dailyQuery += ' GROUP BY DATE(date_time), area ORDER BY date ASC';
     const dailyBreakdown = db.prepare(dailyQuery).all(...dailyParams);
 
+    // Get daily breakdown by category (for stacked bar charts)
+    const dailyByCategory = (!area || area === 'football') ? db.prepare(`
+      SELECT
+        DATE(l.date_time) as date,
+        l.category_id as categoryId,
+        fc.name as categoryName,
+        fc.color as categoryColor,
+        SUM(l.duration_minutes) as totalMinutes
+      FROM log_entries l
+      JOIN football_categories fc ON l.category_id = fc.id
+      WHERE l.user_id = ? AND l.area = 'football' AND DATE(l.date_time) >= ? AND DATE(l.date_time) <= ?
+      GROUP BY DATE(l.date_time), l.category_id
+      ORDER BY date ASC
+    `).all(req.user.id, weekStart, endStr) : [];
+
     const studyTotal = totals.find(t => t.area === 'study') || { totalMinutes: 0, totalSessions: 0 };
     const footballTotal = totals.find(t => t.area === 'football') || { totalMinutes: 0, totalSessions: 0 };
 
@@ -104,7 +119,8 @@ router.get('/weekly', (req, res) => {
         totalSessions: footballTotal.totalSessions || 0,
         breakdown: footballBreakdown
       },
-      daily: dailyBreakdown
+      daily: dailyBreakdown,
+      dailyByCategory
     });
   } catch (error) {
     console.error('Get weekly stats error:', error);

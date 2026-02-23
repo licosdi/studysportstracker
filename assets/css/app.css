@@ -1589,6 +1589,14 @@ body {
   transition: height 0.3s ease;
 }
 
+.bar.stacked {
+  display: flex;
+  flex-direction: column-reverse;
+  overflow: hidden;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+}
+
 .bar-label {
   font-size: 0.7rem;
   color: var(--text-secondary);
