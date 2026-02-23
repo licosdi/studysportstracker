@@ -52,6 +52,14 @@ router.post('/study', (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
+    // If a category with this name exists (even inactive), reactivate it
+    const existing = db.prepare('SELECT * FROM study_categories WHERE user_id = ? AND name = ?').get(req.user.id, name.trim());
+    if (existing) {
+      db.prepare('UPDATE study_categories SET is_active = 1, color = ? WHERE id = ?').run(color || existing.color, existing.id);
+      const category = db.prepare('SELECT * FROM study_categories WHERE id = ?').get(existing.id);
+      return res.status(201).json({ category });
+    }
+
     const result = db.prepare(`
       INSERT INTO study_categories (user_id, name, color)
       VALUES (?, ?, ?)
@@ -60,9 +68,6 @@ router.post('/study', (req, res) => {
     const category = db.prepare('SELECT * FROM study_categories WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ category });
   } catch (error) {
-    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      return res.status(400).json({ error: 'Category already exists' });
-    }
     console.error('Create study category error:', error);
     res.status(500).json({ error: 'Failed to create category' });
   }
@@ -109,17 +114,8 @@ router.delete('/study/:id', (req, res) => {
       return res.status(404).json({ error: 'Category not found' });
     }
 
-    // Check if category is used in any logs
-    const usedInLogs = db.prepare(`
-      SELECT COUNT(*) as count FROM log_entries WHERE category_id = ? AND area = 'study'
-    `).get(id);
-
-    if (usedInLogs.count > 0) {
-      // Deactivate instead of delete
-      db.prepare('UPDATE study_categories SET is_active = 0 WHERE id = ?').run(id);
-      return res.json({ message: 'Category deactivated (has existing logs)', deactivated: true });
-    }
-
+    // Null out log entries' category reference then hard delete
+    db.prepare('UPDATE log_entries SET category_id = NULL WHERE category_id = ? AND area = \'study\'').run(id);
     db.prepare('DELETE FROM study_categories WHERE id = ? AND user_id = ?').run(id, req.user.id);
     res.json({ message: 'Category deleted successfully' });
   } catch (error) {
@@ -173,6 +169,14 @@ router.post('/football', (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
+    // If a category with this name exists (even inactive), reactivate it
+    const existing = db.prepare('SELECT * FROM football_categories WHERE user_id = ? AND name = ?').get(req.user.id, name.trim());
+    if (existing) {
+      db.prepare('UPDATE football_categories SET is_active = 1, type = ?, color = ? WHERE id = ?').run(type || existing.type, color || existing.color, existing.id);
+      const category = db.prepare('SELECT * FROM football_categories WHERE id = ?').get(existing.id);
+      return res.status(201).json({ category });
+    }
+
     const result = db.prepare(`
       INSERT INTO football_categories (user_id, name, type, color)
       VALUES (?, ?, ?, ?)
@@ -181,9 +185,6 @@ router.post('/football', (req, res) => {
     const category = db.prepare('SELECT * FROM football_categories WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json({ category });
   } catch (error) {
-    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      return res.status(400).json({ error: 'Category already exists' });
-    }
     console.error('Create football category error:', error);
     res.status(500).json({ error: 'Failed to create category' });
   }
@@ -231,17 +232,8 @@ router.delete('/football/:id', (req, res) => {
       return res.status(404).json({ error: 'Category not found' });
     }
 
-    // Check if category is used in any logs
-    const usedInLogs = db.prepare(`
-      SELECT COUNT(*) as count FROM log_entries WHERE category_id = ? AND area = 'football'
-    `).get(id);
-
-    if (usedInLogs.count > 0) {
-      // Deactivate instead of delete
-      db.prepare('UPDATE football_categories SET is_active = 0 WHERE id = ?').run(id);
-      return res.json({ message: 'Category deactivated (has existing logs)', deactivated: true });
-    }
-
+    // Null out log entries' category reference then hard delete
+    db.prepare('UPDATE log_entries SET category_id = NULL WHERE category_id = ? AND area = \'football\'').run(id);
     db.prepare('DELETE FROM football_categories WHERE id = ? AND user_id = ?').run(id, req.user.id);
     res.json({ message: 'Category deleted successfully' });
   } catch (error) {
