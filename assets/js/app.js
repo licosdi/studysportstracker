@@ -759,7 +759,7 @@ class LogbookApp {
     const slotHeight = 25;
 
     const scheduled = items.filter(item => item.startTime);
-    const unscheduled = items.filter(item => !item.startTime);
+    const unscheduled = items.filter(item => item.isCompleted && !item.startTime);
 
     // Time column
     let html = '<div class="timetable-time-column">';
