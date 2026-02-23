@@ -142,6 +142,21 @@ router.get('/', (req, res) => {
   }
 });
 
+// POST /api/weekly-plans/reset-timetable
+// Clears all start_time values for the user (called at start of each new week)
+router.post('/reset-timetable', (req, res) => {
+  try {
+    db.prepare(`
+      UPDATE weekly_plan_items SET start_time = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ? AND is_active = 1
+    `).run(req.user.id);
+    res.json({ message: 'Timetable reset' });
+  } catch (error) {
+    console.error('Reset timetable error:', error);
+    res.status(500).json({ error: 'Failed to reset timetable' });
+  }
+});
+
 // POST /api/weekly-plans/reorder
 // Body: { items: [{ id, sortOrder }] }
 router.post('/reorder', (req, res) => {

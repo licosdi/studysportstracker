@@ -145,8 +145,22 @@ class LogbookApp {
   // ==================== DATA LOADING ====================
 
   async loadInitialData() {
+    await this.checkAndResetTimetable();
     await this.loadCategories();
     await this.loadDashboard();
+  }
+
+  async checkAndResetTimetable() {
+    const currentWeek = this.formatDate(this.getWeekStart(new Date()));
+    const lastSeenWeek = localStorage.getItem('timetable_week');
+    if (lastSeenWeek !== currentWeek) {
+      try {
+        await api.resetTimetable();
+        localStorage.setItem('timetable_week', currentWeek);
+      } catch (error) {
+        console.error('Failed to reset timetable:', error);
+      }
+    }
   }
 
   async loadCategories() {

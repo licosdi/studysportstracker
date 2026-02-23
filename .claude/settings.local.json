@@ -10,7 +10,10 @@
       "Bash(git push:*)",
       "Bash(npm install:*)",
       "Bash(npm run migrate:*)",
-      "Bash(node --version:*)"
+      "Bash(node --version:*)",
+      "Bash(git merge:*)",
+      "Bash(sqlite3:*)",
+      "Bash(grep:*)"
     ]
   }
 }

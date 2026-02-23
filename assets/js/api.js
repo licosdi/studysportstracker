@@ -196,6 +196,10 @@ class API {
     return await this.request('POST', '/api/weekly-plans/reorder', { items });
   }
 
+  async resetTimetable() {
+    return await this.request('POST', '/api/weekly-plans/reset-timetable');
+  }
+
   // ==================== ANALYTICS ====================
 
   async getDashboard() {
