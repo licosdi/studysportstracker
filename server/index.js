@@ -57,7 +57,7 @@ app.use((err, req, res, next) => {
 export function startServer(port) {
   const listenPort = port !== undefined ? port : (parseInt(process.env.PORT) || 3000);
   return new Promise((resolve, reject) => {
-    const server = app.listen(listenPort, '127.0.0.1', () => {
+    const server = app.listen(listenPort, () => {
       const addr = server.address();
       console.log(`Logbook Server: http://127.0.0.1:${addr.port}`);
       console.log(`Database: ${process.env.DATABASE_PATH || './server/database/studytracker.db'}`);
