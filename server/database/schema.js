@@ -120,6 +120,30 @@ export const createTables = (db) => {
     // Column already exists, ignore
   }
 
+  // Weekly Plan Templates (date-based schedule templates)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS weekly_plan_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      area TEXT NOT NULL CHECK(area IN ('study', 'football')),
+      start_date TEXT NOT NULL,
+      end_date TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_weekly_plan_templates_user ON weekly_plan_templates(user_id, area)`);
+
+  // Add template_id to weekly_plan_items (NULL = default/legacy schedule)
+  try {
+    db.exec(`ALTER TABLE weekly_plan_items ADD COLUMN template_id INTEGER REFERENCES weekly_plan_templates(id) ON DELETE SET NULL`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_weekly_plan_items_template ON weekly_plan_items(template_id)`);
+
   // Create indexes for better query performance
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_study_categories_user ON study_categories(user_id);

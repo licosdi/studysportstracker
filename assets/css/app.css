@@ -1,4 +1,30 @@
 /* Logbook App Styles */
+
+/* ==================== PWA OFFLINE BANNER ==================== */
+.offline-banner {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--danger-color);
+  color: #fff;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  z-index: 9999;
+}
+
+body.offline .offline-banner {
+  display: block;
+}
+
+/* Push main content down when offline banner is visible */
+body.offline .main-app {
+  padding-top: 36px;
+}
+/* ==================== END PWA OFFLINE BANNER ==================== */
 :root {
   --primary-color: #6366f1;
   --primary-dark: #4f46e5;
@@ -1311,6 +1337,12 @@ body {
 
 .plan-item.drag-over {
   border-top: 2px solid var(--primary-color);
+}
+
+.day-items.drag-target {
+  outline: 2px dashed var(--primary-color);
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.04);
 }
 
 .plan-item-title {

@@ -11,9 +11,28 @@
       "Bash(npm install:*)",
       "Bash(npm run migrate:*)",
       "Bash(node --version:*)",
-      "Bash(git merge:*)",
-      "Bash(sqlite3:*)",
-      "Bash(grep:*)"
+      "Bash(gh api:*)",
+      "Bash(git fetch:*)",
+      "Bash(cat:*)",
+      "Bash([ -s $HOME/.nvm/nvm.sh ])",
+      "Bash(brew list:*)",
+      "Bash(npm info:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(gh auth status:*)",
+      "Bash(/opt/homebrew/bin/brew install:*)",
+      "Bash(/opt/homebrew/bin/gh auth status)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QHRlc3QuY29tIiwibmFtZSI6IlRlc3QgVXNlciIsImlhdCI6MTc3MDg4NjY4NCwiZXhwIjoxNzcxNDkxNDg0fQ.S3RcNsG7n0PDKotolyqfLZuA16wLp23ob4sMQG0AbWg\")",
+      "Bash(echo \"=== Get study categories ===\" curl -s http://localhost:3000/api/categories/study -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(python3:*)",
+      "Bash(echo \"\" echo \"=== Get weekly plans (empty) ===\" curl -s \"http://localhost:3000/api/weekly-plans?area=study\" -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(curl:*)",
+      "Bash(git -C /Users/liam/Documents/Cursor/Studytracker status:*)",
+      "Bash(git -C /Users/liam/Documents/Cursor/Studytracker log --oneline -5)",
+      "Bash(git -C /Users/liam/Documents/Cursor/Studytracker diff --stat)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(node -c:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJ0ZXN0QHRlc3QuY29tIiwibmFtZSI6IlRlc3QgVXNlciIsImlhdCI6MTc3MTMwODk0MywiZXhwIjoxNzcxOTEzNzQzfQ.mLmIsW6msKWsS3IZUn8ecD9JhKBWZxwPqmBf-owW00w\")"
     ]
   }
 }

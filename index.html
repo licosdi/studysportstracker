@@ -8,6 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Logbook">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
 </head>
 <body>
   <div id="app">
@@ -384,6 +390,7 @@
             <button class="settings-tab active" data-tab="account">Account</button>
             <button class="settings-tab" data-tab="study-presets">Study Categories</button>
             <button class="settings-tab" data-tab="football-presets">Football Categories</button>
+            <button class="settings-tab" data-tab="weekly-templates">Weekly Plan Templates</button>
           </div>
 
           <!-- Account Settings -->
@@ -435,6 +442,28 @@
               </div>
             </div>
           </div>
+
+          <!-- Weekly Plan Templates Settings -->
+          <div id="weekly-templates-settings" class="settings-panel">
+            <div class="card">
+              <div class="card-header">
+                <h3>Study Plan Templates</h3>
+                <button class="btn btn-primary btn-sm" id="add-study-template-btn">+ New Template</button>
+              </div>
+              <div class="card-body">
+                <div id="study-templates-list"></div>
+              </div>
+            </div>
+            <div class="card" style="margin-top:1rem">
+              <div class="card-header">
+                <h3>Football Plan Templates</h3>
+                <button class="btn btn-primary btn-sm" id="add-football-template-btn">+ New Template</button>
+              </div>
+              <div class="card-body">
+                <div id="football-templates-list"></div>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
     </div>
@@ -453,8 +482,17 @@
     </div>
   </div>
 
+  <div class="offline-banner">You're offline — changes will sync when reconnected</div>
+
   <script src="assets/js/api.js"></script>
   <script src="assets/js/football-scoring.js"></script>
   <script src="assets/js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+    window.addEventListener('online', () => document.body.classList.remove('offline'));
+    window.addEventListener('offline', () => document.body.classList.add('offline'));
+  </script>
 </body>
 </html>

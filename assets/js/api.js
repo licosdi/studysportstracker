@@ -200,6 +200,34 @@ class API {
     return await this.request('POST', '/api/weekly-plans/reset-timetable');
   }
 
+  // ==================== WEEKLY PLAN TEMPLATES ====================
+
+  async getWeeklyPlanTemplates(area = null) {
+    const params = {};
+    if (area) params.area = area;
+    const query = new URLSearchParams(params).toString();
+    return await this.request('GET', `/api/weekly-plan-templates${query ? '?' + query : ''}`);
+  }
+
+  async getActiveWeeklyPlanTemplate(area, date = null) {
+    const params = { area };
+    if (date) params.date = date;
+    const query = new URLSearchParams(params).toString();
+    return await this.request('GET', `/api/weekly-plan-templates/active?${query}`);
+  }
+
+  async createWeeklyPlanTemplate(data) {
+    return await this.request('POST', '/api/weekly-plan-templates', data);
+  }
+
+  async updateWeeklyPlanTemplate(id, data) {
+    return await this.request('PUT', `/api/weekly-plan-templates/${id}`, data);
+  }
+
+  async deleteWeeklyPlanTemplate(id) {
+    return await this.request('DELETE', `/api/weekly-plan-templates/${id}`);
+  }
+
   // ==================== ANALYTICS ====================
 
   async getDashboard() {

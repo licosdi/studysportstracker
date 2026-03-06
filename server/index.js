@@ -9,6 +9,7 @@ import plansRoutes from './routes/plans.js';
 import logsRoutes from './routes/logs.js';
 import analyticsRoutes from './routes/analytics.js';
 import weeklyPlansRoutes from './routes/weekly-plans.js';
+import weeklyPlanTemplatesRoutes from './routes/weekly-plan-templates.js';
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/weekly-plans', weeklyPlansRoutes);
+app.use('/api/weekly-plan-templates', weeklyPlanTemplatesRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
@@ -52,12 +54,20 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`
-  Logbook Server Running!
-  Server: http://localhost:${PORT}
-  Database: SQLite (${process.env.DATABASE_PATH || './server/database/studytracker.db'})
-  `);
-});
+export function startServer(port) {
+  const listenPort = port !== undefined ? port : (parseInt(process.env.PORT) || 3000);
+  return new Promise((resolve, reject) => {
+    const server = app.listen(listenPort, '127.0.0.1', () => {
+      const addr = server.address();
+      console.log(`Logbook Server: http://127.0.0.1:${addr.port}`);
+      console.log(`Database: ${process.env.DATABASE_PATH || './server/database/studytracker.db'}`);
+      resolve(addr.port);
+    });
+    server.on('error', reject);
+  });
+}
 
-export default app;
+// Preserve `npm start` / `node server/index.js` direct-run behavior
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  startServer();
+}

@@ -2,6 +2,19 @@ import express from 'express';
 import db from '../database/db.js';
 import { authenticateToken } from '../middleware/auth.js';
 
+// Helper: resolve active template for a user/area/date
+function resolveActiveTemplate(userId, area, date) {
+  if (!area) return null;
+  return db.prepare(`
+    SELECT id FROM weekly_plan_templates
+    WHERE user_id = ? AND area = ?
+      AND start_date <= ?
+      AND (end_date IS NULL OR end_date >= ?)
+    ORDER BY start_date DESC
+    LIMIT 1
+  `).get(userId, area, date, date);
+}
+
 const router = express.Router();
 
 // All routes require authentication
@@ -77,6 +90,15 @@ router.get('/week-status', (req, res) => {
     if (area && ['study', 'football'].includes(area)) {
       query += ' AND w.area = ?';
       params.push(area);
+
+      // Filter by active template for this week
+      const activeTemplate = resolveActiveTemplate(req.user.id, area, weekStart);
+      if (activeTemplate) {
+        query += ' AND w.template_id = ?';
+        params.push(activeTemplate.id);
+      } else {
+        query += ' AND w.template_id IS NULL';
+      }
     }
 
     query += ' ORDER BY w.day_of_week ASC, w.sort_order ASC, w.created_at ASC';
@@ -130,6 +152,16 @@ router.get('/', (req, res) => {
     if (area && ['study', 'football'].includes(area)) {
       query += ' AND w.area = ?';
       params.push(area);
+
+      // Filter by active template for today
+      const today = new Date().toISOString().split('T')[0];
+      const activeTemplate = resolveActiveTemplate(req.user.id, area, today);
+      if (activeTemplate) {
+        query += ' AND w.template_id = ?';
+        params.push(activeTemplate.id);
+      } else {
+        query += ' AND w.template_id IS NULL';
+      }
     }
 
     query += ' ORDER BY w.day_of_week ASC, w.sort_order ASC, w.created_at ASC';
@@ -166,14 +198,22 @@ router.post('/reorder', (req, res) => {
       return res.status(400).json({ error: 'items array is required' });
     }
 
-    const update = db.prepare(`
+    const updateWithDay = db.prepare(`
+      UPDATE weekly_plan_items SET sort_order = ?, day_of_week = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
+    `);
+    const updateSortOnly = db.prepare(`
       UPDATE weekly_plan_items SET sort_order = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
     `);
 
     const updateMany = db.transaction((rows) => {
       for (const row of rows) {
-        update.run(row.sortOrder, row.id, req.user.id);
+        if (row.dayOfWeek !== undefined) {
+          updateWithDay.run(row.sortOrder, row.dayOfWeek, row.id, req.user.id);
+        } else {
+          updateSortOnly.run(row.sortOrder, row.id, req.user.id);
+        }
       }
     });
 
@@ -206,10 +246,15 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: 'Intensity must be low, medium, or high' });
     }
 
+    // Assign to active template if one is active today
+    const today = new Date().toISOString().split('T')[0];
+    const activeTemplate = resolveActiveTemplate(req.user.id, area, today);
+    const templateId = activeTemplate ? activeTemplate.id : null;
+
     const result = db.prepare(`
-      INSERT INTO weekly_plan_items (user_id, area, day_of_week, category_id, title, notes, duration_minutes, intensity, start_time)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(req.user.id, area, dayOfWeek, categoryId, title, notes || null, durationMinutes || 45, intensity || null, startTime || null);
+      INSERT INTO weekly_plan_items (user_id, area, day_of_week, category_id, title, notes, duration_minutes, intensity, start_time, template_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(req.user.id, area, dayOfWeek, categoryId, title, notes || null, durationMinutes || 45, intensity || null, startTime || null, templateId);
 
     const item = db.prepare(`
       SELECT

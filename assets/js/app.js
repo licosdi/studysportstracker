@@ -282,6 +282,8 @@ class LogbookApp {
     // Settings actions
     document.getElementById('add-study-category-btn').addEventListener('click', () => this.openCategoryModal('study'));
     document.getElementById('add-football-category-btn').addEventListener('click', () => this.openCategoryModal('football'));
+    document.getElementById('add-study-template-btn')?.addEventListener('click', () => this.openTemplateModal('study'));
+    document.getElementById('add-football-template-btn')?.addEventListener('click', () => this.openTemplateModal('football'));
 
     // Modal close
     document.getElementById('modal-close').addEventListener('click', () => this.closeModal());
@@ -402,6 +404,11 @@ class LogbookApp {
     timer.isRunning = true;
     timer.isPaused = false;
 
+    // Request notification permission the first time the timer is started
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
     const categories = area === 'study' ? this.studyCategories : this.footballCategories;
     const category = categories.find(c => c.id === timer.categoryId);
     const label = document.getElementById(`${area}-timer-label`);
@@ -501,6 +508,19 @@ class LogbookApp {
 
       const label = document.getElementById(`${area}-timer-label`);
       if (label) label.textContent = 'Session complete!';
+
+      // Fire macOS notification via service worker (or directly if SW unavailable)
+      const notifTitle = 'Logbook';
+      const notifBody = `${category?.name || area} session complete! Time for a break.`;
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'TIMER_COMPLETE',
+          title: notifTitle,
+          body: notifBody,
+        });
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(notifTitle, { body: notifBody, icon: '/assets/icons/icon-192.png' });
+      }
 
     } catch (error) {
       console.error('Failed to log session:', error);
@@ -639,66 +659,79 @@ class LogbookApp {
 
   setupDragAndDrop(container, area) {
     let draggedEl = null;
+    let dragSourceDay = null;
 
-    container.querySelectorAll('.day-items').forEach(dayList => {
-      dayList.addEventListener('dragstart', (e) => {
-        const item = e.target.closest('.plan-item');
-        if (!item) return;
-        draggedEl = item;
-        item.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', item.dataset.id);
-      });
+    // Event delegation on the grid container — enables cross-day drag
+    container.addEventListener('dragstart', (e) => {
+      const item = e.target.closest('.plan-item');
+      if (!item) return;
+      draggedEl = item;
+      dragSourceDay = parseInt(item.closest('.day-items').dataset.day);
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', item.dataset.id);
+    });
 
-      dayList.addEventListener('dragend', (e) => {
-        const item = e.target.closest('.plan-item');
-        if (item) item.classList.remove('dragging');
-        container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
-        draggedEl = null;
-      });
+    container.addEventListener('dragend', () => {
+      if (draggedEl) draggedEl.classList.remove('dragging');
+      container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+      container.querySelectorAll('.day-items.drag-target').forEach(el => el.classList.remove('drag-target'));
+      draggedEl = null;
+      dragSourceDay = null;
+    });
 
-      dayList.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const target = e.target.closest('.plan-item');
-        if (!target || target === draggedEl) return;
-        // Only allow reorder within same day
-        if (target.closest('.day-items') !== draggedEl?.closest('.day-items')) return;
-        container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
-        target.classList.add('drag-over');
-      });
+    container.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!draggedEl) return;
+      container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+      container.querySelectorAll('.day-items.drag-target').forEach(el => el.classList.remove('drag-target'));
+      const targetItem = e.target.closest('.plan-item');
+      const targetDayList = e.target.closest('.day-items');
+      if (targetItem && targetItem !== draggedEl) {
+        targetItem.classList.add('drag-over');
+      } else if (targetDayList) {
+        targetDayList.classList.add('drag-target');
+      }
+    });
 
-      dayList.addEventListener('dragleave', (e) => {
-        const target = e.target.closest('.plan-item');
-        if (target) target.classList.remove('drag-over');
-      });
+    container.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (!draggedEl) return;
+      container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+      container.querySelectorAll('.day-items.drag-target').forEach(el => el.classList.remove('drag-target'));
 
-      dayList.addEventListener('drop', (e) => {
-        e.preventDefault();
-        if (!draggedEl) return;
-        const target = e.target.closest('.plan-item');
-        if (!target || target === draggedEl) return;
-        if (target.closest('.day-items') !== draggedEl.closest('.day-items')) return;
+      const targetItem = e.target.closest('.plan-item');
+      const targetDayList = e.target.closest('.day-items');
+      if (!targetDayList) return;
 
-        const list = draggedEl.closest('.day-items');
-        const allItems = [...list.querySelectorAll('.plan-item')];
-        const dragIdx = allItems.indexOf(draggedEl);
-        const targetIdx = allItems.indexOf(target);
+      const targetDay = parseInt(targetDayList.dataset.day);
 
-        if (dragIdx < targetIdx) {
-          list.insertBefore(draggedEl, target.nextSibling);
-        } else {
-          list.insertBefore(draggedEl, target);
+      if (targetItem && targetItem !== draggedEl) {
+        // Insert before or after based on cursor Y midpoint
+        const rect = targetItem.getBoundingClientRect();
+        const before = e.clientY < (rect.top + rect.height / 2);
+        targetDayList.insertBefore(draggedEl, before ? targetItem : targetItem.nextSibling);
+      } else {
+        // Dropped onto empty space — append to end of day
+        targetDayList.appendChild(draggedEl);
+      }
+
+      // Build reorder payload for both affected days
+      const reorderPayload = [...targetDayList.querySelectorAll('.plan-item')]
+        .map((el, idx) => ({ id: parseInt(el.dataset.id), sortOrder: idx, dayOfWeek: targetDay }));
+
+      if (dragSourceDay !== targetDay) {
+        const sourceDayList = container.querySelector(`.day-items[data-day="${dragSourceDay}"]`);
+        if (sourceDayList) {
+          [...sourceDayList.querySelectorAll('.plan-item')]
+            .forEach((el, idx) => reorderPayload.push({ id: parseInt(el.dataset.id), sortOrder: idx, dayOfWeek: dragSourceDay }));
         }
+      }
 
-        target.classList.remove('drag-over');
-
-        // Persist new order
-        const reordered = [...list.querySelectorAll('.plan-item')].map((el, idx) => ({
-          id: parseInt(el.dataset.id),
-          sortOrder: idx
-        }));
-        api.reorderWeeklyPlans(reordered).catch(err => console.error('Reorder failed', err));
+      api.reorderWeeklyPlans(reorderPayload).catch(() => {
+        if (area === 'study') this.loadStudyWeeklyPlan();
+        else this.loadFootballWeeklyPlan();
       });
     });
   }
@@ -1158,6 +1191,8 @@ class LogbookApp {
   loadSettings() {
     this.renderStudyCategories();
     this.renderFootballCategories();
+    this.loadAndRenderTemplates('study');
+    this.loadAndRenderTemplates('football');
   }
 
   renderStudyCategories() {
@@ -1244,6 +1279,109 @@ class LogbookApp {
       this.renderFootballCategories();
     } catch (error) {
       console.error('Delete football category error:', error);
+    }
+  }
+
+  // ==================== WEEKLY PLAN TEMPLATES ====================
+
+  async loadAndRenderTemplates(area) {
+    try {
+      const { templates } = await api.getWeeklyPlanTemplates(area);
+      this.renderTemplateList(area, templates);
+    } catch (error) {
+      console.error(`Failed to load ${area} templates:`, error);
+    }
+  }
+
+  renderTemplateList(area, templates) {
+    const container = document.getElementById(`${area}-templates-list`);
+    if (!container) return;
+    const today = new Date().toISOString().split('T')[0];
+
+    if (templates.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-muted,#94a3b8);font-size:0.875rem;padding:0.5rem 0">No templates yet. All sessions use the default schedule.</p>';
+      return;
+    }
+
+    container.innerHTML = templates.map(t => {
+      const isActive = t.startDate <= today && (!t.endDate || t.endDate >= today);
+      return `
+        <div class="category-item" style="justify-content:space-between">
+          <div style="display:flex;flex-direction:column;gap:0.2rem">
+            <span style="font-weight:500">${t.name}${isActive ? ' <span style="background:var(--primary,#6366f1);color:#fff;font-size:0.7rem;padding:0.1rem 0.4rem;border-radius:9999px;font-weight:600">Active</span>' : ''}</span>
+            <span style="font-size:0.8rem;color:var(--text-muted,#94a3b8)">${t.startDate} — ${t.endDate || 'ongoing'}</span>
+          </div>
+          <div class="category-actions">
+            <button class="btn btn-ghost btn-sm" data-edit-template="${t.id}" data-area="${area}">Edit</button>
+            <button class="btn btn-ghost btn-sm" data-delete-template="${t.id}" data-area="${area}">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('[data-edit-template]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const template = templates.find(t => t.id === parseInt(btn.dataset.editTemplate));
+        this.openTemplateModal(btn.dataset.area, template);
+      });
+    });
+    container.querySelectorAll('[data-delete-template]').forEach(btn => {
+      btn.addEventListener('click', () => this.deleteTemplate(btn.dataset.area, btn.dataset.deleteTemplate));
+    });
+  }
+
+  openTemplateModal(area, existing = null) {
+    const isEdit = !!existing;
+    const title = isEdit ? 'Edit Template' : `New ${area === 'study' ? 'Study' : 'Football'} Template`;
+    this.openModal(title, `
+      <form id="template-form">
+        <div class="form-group">
+          <label>Template Name</label>
+          <input type="text" id="template-name" class="form-input" placeholder="e.g. Pre-season block" value="${existing ? existing.name : ''}" required>
+        </div>
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="template-start-date" class="form-input" value="${existing ? existing.startDate : ''}" required>
+        </div>
+        <div class="form-group">
+          <label>End Date <span style="color:var(--text-muted,#94a3b8);font-size:0.8rem">(optional — leave blank for open-ended)</span></label>
+          <input type="date" id="template-end-date" class="form-input" value="${existing && existing.endDate ? existing.endDate : ''}">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%">${isEdit ? 'Save Changes' : 'Create Template'}</button>
+      </form>
+    `);
+
+    document.getElementById('template-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('template-name').value.trim();
+      const startDate = document.getElementById('template-start-date').value;
+      const endDate = document.getElementById('template-end-date').value || null;
+      if (!name || !startDate) return;
+      try {
+        if (isEdit) {
+          await api.updateWeeklyPlanTemplate(existing.id, { name, startDate, endDate });
+        } else {
+          await api.createWeeklyPlanTemplate({ name, area, startDate, endDate });
+        }
+        this.closeModal();
+        this.loadAndRenderTemplates(area);
+      } catch (error) {
+        alert(error.message || 'Failed to save template');
+      }
+    });
+  }
+
+  async deleteTemplate(area, id) {
+    if (!confirm('Delete this template?')) return;
+    try {
+      await api.deleteWeeklyPlanTemplate(id);
+      this.loadAndRenderTemplates(area);
+    } catch (error) {
+      if (error.message && error.message.includes('active sessions')) {
+        alert('This template has active sessions. Remove them from the planner first.');
+      } else {
+        alert(error.message || 'Failed to delete template');
+      }
     }
   }
 
