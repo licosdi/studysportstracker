@@ -86,6 +86,12 @@
             </a>
           </li>
           <li class="nav-item">
+            <a href="#" class="nav-link" data-view="daily-plan">
+              <span class="nav-icon">&#128197;</span>
+              Daily Plan
+            </a>
+          </li>
+          <li class="nav-item">
             <a href="#" class="nav-link" data-view="study-stats">
               <span class="nav-icon">&#128202;</span>
               Stats
@@ -259,6 +265,46 @@
             </div>
             <div class="timetable-unscheduled" id="study-unscheduled-items">
               <!-- Items without start_time -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Daily Plan View -->
+        <section id="daily-plan-view" class="view">
+          <div class="view-header">
+            <div>
+              <h2>Daily Plan</h2>
+              <p class="view-subtitle" id="daily-plan-date-label"></p>
+            </div>
+            <div class="view-actions">
+              <button class="btn btn-ghost" id="daily-plan-prev">&#8592;</button>
+              <input type="date" id="daily-plan-date-picker" class="form-input daily-plan-date-input">
+              <button class="btn btn-ghost" id="daily-plan-next">&#8594;</button>
+              <button class="btn btn-secondary" id="daily-plan-today-btn">Today</button>
+            </div>
+          </div>
+
+          <div class="daily-plan-tabs">
+            <button class="daily-plan-tab active" data-area="study">Study</button>
+            <button class="daily-plan-tab" data-area="football">Football</button>
+          </div>
+
+          <div class="card" style="margin-top: 1rem;">
+            <div class="card-header">
+              <h3 id="daily-plan-area-label">Study Sessions</h3>
+              <button class="btn btn-primary btn-sm" id="add-daily-plan-btn">+ Add Session</button>
+            </div>
+            <div class="card-body">
+              <div id="daily-plan-list">
+                <p class="empty-state">No sessions planned for this day</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 1rem;" id="daily-plan-summary-card">
+            <div class="card-header"><h3>Summary</h3></div>
+            <div class="card-body">
+              <div id="daily-plan-summary"></div>
             </div>
           </div>
         </section>

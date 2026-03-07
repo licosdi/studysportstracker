@@ -2254,3 +2254,180 @@ body {
     height: 120px;
   }
 }
+
+/* ==================== DAILY PLAN VIEW ==================== */
+
+.daily-plan-date-input {
+  width: auto;
+  min-width: 140px;
+  font-size: 0.875rem;
+  padding: 0.375rem 0.625rem;
+  display: inline-block;
+}
+
+.daily-plan-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.daily-plan-tab {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.daily-plan-tab.active {
+  background: var(--primary-color, #6366f1);
+  color: #fff;
+  border-color: var(--primary-color, #6366f1);
+}
+
+.daily-plan-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.daily-plan-item:last-child {
+  border-bottom: none;
+}
+
+.daily-plan-item:hover {
+  background: var(--bg-color);
+}
+
+.daily-plan-item.completed {
+  opacity: 0.65;
+}
+
+.daily-plan-item.completed .daily-plan-item-title {
+  text-decoration: line-through;
+}
+
+.daily-plan-item.skipped {
+  opacity: 0.45;
+}
+
+.daily-plan-item.skipped .daily-plan-item-title {
+  text-decoration: line-through;
+  color: var(--text-muted, #94a3b8);
+}
+
+.daily-plan-item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.daily-plan-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.daily-plan-item-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.daily-plan-item-notes {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.daily-plan-item-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.daily-plan-item-duration {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.daily-plan-intensity {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.intensity-low  { background: #d1fae5; color: #065f46; }
+.intensity-medium { background: #fef3c7; color: #92400e; }
+.intensity-high { background: #fee2e2; color: #991b1b; }
+
+.daily-plan-status-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
+  text-transform: capitalize;
+}
+
+.status-completed { background: #d1fae5; color: #065f46; }
+.status-skipped   { background: #f1f5f9; color: #64748b; }
+
+.daily-plan-item-actions {
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.daily-plan-item:hover .daily-plan-item-actions {
+  opacity: 1;
+}
+
+.daily-plan-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Edit button in weekly plan grid */
+.edit-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  padding: 0.125rem 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.edit-btn:hover {
+  background: var(--bg-color);
+  color: var(--primary-color, #6366f1);
+}

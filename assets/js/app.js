@@ -12,6 +12,10 @@ class LogbookApp {
     this.footballStatsMode = 'daily';
     this.footballStatsDate = new Date();
 
+    // Daily plan state
+    this.dailyPlanDate = new Date();
+    this.dailyPlanArea = 'study';
+
     // Timer state
     this.timers = {
       study: {
@@ -203,9 +207,18 @@ class LogbookApp {
             ${s.isCompleted ? '<span class="from-plan-badge">done</span>' : ''}
           </div>
         `).join('');
+        pendingPlansEl.innerHTML += `<div style="margin-top: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 0.5rem;">
+          <a href="#" class="open-daily-plan-link" style="font-size:0.8rem;color:var(--primary-color,#6366f1)">&#128197; Open Daily Plan to edit &rarr;</a>
+        </div>`;
       } else {
-        pendingPlansEl.innerHTML = '<p class="empty-state">No sessions scheduled for today</p>';
+        pendingPlansEl.innerHTML = `<p class="empty-state">No sessions scheduled for today</p>
+          <a href="#" class="open-daily-plan-link" style="font-size:0.8rem;color:var(--primary-color,#6366f1)">&#128197; Plan your day &rarr;</a>`;
       }
+      pendingPlansEl.querySelector('.open-daily-plan-link')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.dailyPlanDate = new Date();
+        this.navigateTo('daily-plan');
+      });
 
       // Recent logs
       const recentLogsEl = document.getElementById('recent-logs-list');
@@ -285,6 +298,37 @@ class LogbookApp {
     document.getElementById('add-study-template-btn')?.addEventListener('click', () => this.openTemplateModal('study'));
     document.getElementById('add-football-template-btn')?.addEventListener('click', () => this.openTemplateModal('football'));
 
+    // Daily plan navigation
+    document.getElementById('daily-plan-prev')?.addEventListener('click', () => {
+      this.dailyPlanDate.setDate(this.dailyPlanDate.getDate() - 1);
+      this.loadDailyPlan();
+    });
+    document.getElementById('daily-plan-next')?.addEventListener('click', () => {
+      this.dailyPlanDate.setDate(this.dailyPlanDate.getDate() + 1);
+      this.loadDailyPlan();
+    });
+    document.getElementById('daily-plan-today-btn')?.addEventListener('click', () => {
+      this.dailyPlanDate = new Date();
+      this.loadDailyPlan();
+    });
+    document.getElementById('daily-plan-date-picker')?.addEventListener('change', (e) => {
+      if (e.target.value) {
+        this.dailyPlanDate = new Date(e.target.value + 'T12:00:00');
+        this.loadDailyPlan();
+      }
+    });
+    document.querySelectorAll('.daily-plan-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.daily-plan-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.dailyPlanArea = tab.dataset.area;
+        this.loadDailyPlan();
+      });
+    });
+    document.getElementById('add-daily-plan-btn')?.addEventListener('click', () => {
+      this.openDailyPlanModal();
+    });
+
     // Modal close
     document.getElementById('modal-close').addEventListener('click', () => this.closeModal());
     document.getElementById('modal-overlay').addEventListener('click', (e) => {
@@ -318,6 +362,7 @@ class LogbookApp {
       case 'dashboard': this.loadDashboard(); break;
       case 'study-timer': this.loadStudyTimer(); break;
       case 'study-weekly-plan': this.loadStudyWeeklyPlan(); break;
+      case 'daily-plan': this.loadDailyPlan(); break;
       case 'study-stats': this.loadStudyStats(); break;
       case 'football-weekly-plan': this.loadFootballWeeklyPlan(); break;
       case 'football-stats': this.loadFootballStats(); break;
@@ -617,6 +662,7 @@ class LogbookApp {
                     <div class="plan-item-meta">${item.durationMinutes}m</div>
                   </div>
                   <div class="plan-item-actions">
+                    <button class="edit-btn" data-weekly-id="${item.id}" title="Edit">&#9998;</button>
                     <button class="delete-btn" data-weekly-id="${item.id}" title="Remove">&#128465;</button>
                   </div>
                 </div>
@@ -635,6 +681,15 @@ class LogbookApp {
         const id = cb.dataset.weeklyId;
         if (cb.checked) this.completeWeeklyPlan(id, area);
         else this.uncompleteWeeklyPlan(id, area);
+      });
+    });
+
+    // Edit listeners
+    container.querySelectorAll('.edit-btn[data-weekly-id]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const item = items.find(it => it.id === parseInt(btn.dataset.weeklyId));
+        if (item) this.openEditWeeklyPlanModal(item, area);
       });
     });
 
@@ -774,6 +829,210 @@ class LogbookApp {
       else this.loadFootballWeeklyPlan();
     } catch (error) {
       console.error('Delete weekly plan error:', error);
+    }
+  }
+
+  // ==================== DAILY PLAN ====================
+
+  async loadDailyPlan() {
+    const dateStr = this.formatDate(this.dailyPlanDate);
+
+    // Update date picker and label
+    const picker = document.getElementById('daily-plan-date-picker');
+    if (picker) picker.value = dateStr;
+
+    const isToday = dateStr === this.formatDate(new Date());
+    const label = document.getElementById('daily-plan-date-label');
+    if (label) {
+      label.textContent = this.dailyPlanDate.toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+      }) + (isToday ? ' — Today' : '');
+    }
+
+    const areaLabel = document.getElementById('daily-plan-area-label');
+    if (areaLabel) areaLabel.textContent = this.dailyPlanArea === 'study' ? 'Study Sessions' : 'Football Sessions';
+
+    try {
+      const { items } = await api.getPlans({ startDate: dateStr, endDate: dateStr, area: this.dailyPlanArea });
+      this.renderDailyPlanList(items, dateStr);
+    } catch (error) {
+      console.error('Failed to load daily plan:', error);
+    }
+  }
+
+  renderDailyPlanList(items, dateStr) {
+    const container = document.getElementById('daily-plan-list');
+    const summaryEl = document.getElementById('daily-plan-summary');
+
+    if (items.length === 0) {
+      container.innerHTML = '<p class="empty-state">No sessions planned for this day. Click "+ Add Session" to create one.</p>';
+      if (summaryEl) summaryEl.innerHTML = '<p class="empty-state">No sessions</p>';
+      return;
+    }
+
+    container.innerHTML = items.map(item => {
+      const statusClass = item.status === 'completed' ? 'completed' : item.status === 'skipped' ? 'skipped' : '';
+      const statusBadge = item.status !== 'planned'
+        ? `<span class="daily-plan-status-badge status-${item.status}">${item.status}</span>`
+        : '';
+      return `
+        <div class="daily-plan-item ${statusClass}" data-id="${item.id}">
+          <div class="daily-plan-item-left">
+            <span class="category-badge" style="background: ${item.categoryColor}">${item.categoryName}</span>
+            <div class="daily-plan-item-details">
+              <span class="daily-plan-item-title">${item.title}</span>
+              ${item.notes ? `<span class="daily-plan-item-notes">${item.notes}</span>` : ''}
+            </div>
+          </div>
+          <div class="daily-plan-item-right">
+            <span class="daily-plan-item-duration">${this.formatDuration(item.durationMinutes)}</span>
+            ${item.intensity ? `<span class="daily-plan-intensity intensity-${item.intensity}">${item.intensity}</span>` : ''}
+            ${statusBadge}
+            <div class="daily-plan-item-actions">
+              ${item.status === 'planned' ? `<button class="btn btn-ghost btn-sm daily-complete-btn" data-id="${item.id}" title="Mark complete">&#10003;</button>` : ''}
+              ${item.status === 'planned' ? `<button class="btn btn-ghost btn-sm daily-skip-btn" data-id="${item.id}" title="Skip">&#8212;</button>` : ''}
+              <button class="btn btn-ghost btn-sm daily-edit-btn" data-id="${item.id}" title="Edit">&#9998;</button>
+              <button class="btn btn-ghost btn-sm daily-delete-btn" data-id="${item.id}" title="Delete">&#128465;</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Summary
+    const totalMinutes = items.reduce((sum, i) => sum + i.durationMinutes, 0);
+    const completed = items.filter(i => i.status === 'completed').length;
+    const skipped = items.filter(i => i.status === 'skipped').length;
+    const planned = items.filter(i => i.status === 'planned').length;
+    if (summaryEl) {
+      summaryEl.innerHTML = `
+        <div class="daily-plan-summary-row">
+          <span>Total planned: <strong>${this.formatDuration(totalMinutes)}</strong></span>
+          <span>${completed} completed &nbsp;|&nbsp; ${skipped} skipped &nbsp;|&nbsp; ${planned} pending</span>
+        </div>
+        <div class="progress-bar-container" style="margin-top: 0.5rem;">
+          <div class="progress-bar" style="width: ${items.length > 0 ? ((completed / items.length) * 100).toFixed(0) : 0}%"></div>
+        </div>
+      `;
+    }
+
+    // Attach action listeners
+    container.querySelectorAll('.daily-complete-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.completeDailyPlanItem(btn.dataset.id));
+    });
+    container.querySelectorAll('.daily-skip-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.skipDailyPlanItem(btn.dataset.id));
+    });
+    container.querySelectorAll('.daily-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = items.find(i => i.id === parseInt(btn.dataset.id));
+        if (item) this.openDailyPlanModal(item);
+      });
+    });
+    container.querySelectorAll('.daily-delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.deleteDailyPlanItem(btn.dataset.id));
+    });
+  }
+
+  openDailyPlanModal(existing = null) {
+    const isEdit = !!existing;
+    const area = this.dailyPlanArea;
+    const categories = area === 'study' ? this.studyCategories.filter(c => c.isActive) : this.footballCategories.filter(c => c.isActive);
+    const dateStr = this.formatDate(this.dailyPlanDate);
+
+    this.openModal(isEdit ? 'Edit Session' : `Add ${area === 'study' ? 'Study' : 'Football'} Session`, `
+      <form id="daily-plan-form">
+        <div class="form-group">
+          <label>Category</label>
+          <select id="daily-plan-category" class="form-select" required>
+            ${categories.map(c => `<option value="${c.id}" ${isEdit && c.id === existing.categoryId ? 'selected' : ''}>${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" id="daily-plan-title" class="form-input" placeholder="Session title" value="${isEdit ? existing.title : ''}" required>
+        </div>
+        <div class="form-group">
+          <label>Duration (minutes)</label>
+          <input type="number" id="daily-plan-duration" class="form-input" value="${isEdit ? existing.durationMinutes : 45}" min="5" max="480" required>
+        </div>
+        <div class="form-group">
+          <label>Intensity (optional)</label>
+          <select id="daily-plan-intensity" class="form-select">
+            <option value="">None</option>
+            <option value="low" ${isEdit && existing.intensity === 'low' ? 'selected' : ''}>Low</option>
+            <option value="medium" ${isEdit && existing.intensity === 'medium' ? 'selected' : ''}>Medium</option>
+            <option value="high" ${isEdit && existing.intensity === 'high' ? 'selected' : ''}>High</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <textarea id="daily-plan-notes" class="form-input" rows="2">${isEdit && existing.notes ? existing.notes : ''}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">${isEdit ? 'Save Changes' : 'Add Session'}</button>
+      </form>
+    `);
+
+    document.getElementById('daily-plan-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const categoryId = parseInt(document.getElementById('daily-plan-category').value);
+        const selectedCat = categories.find(c => c.id === categoryId);
+        const title = document.getElementById('daily-plan-title').value.trim();
+        const durationMinutes = parseInt(document.getElementById('daily-plan-duration').value);
+        const intensity = document.getElementById('daily-plan-intensity').value || null;
+        const notes = document.getElementById('daily-plan-notes').value || null;
+
+        if (isEdit) {
+          await api.updatePlan(existing.id, { title, categoryId, durationMinutes, intensity, notes });
+        } else {
+          await api.createPlan({ date: dateStr, area, title: title || (selectedCat ? selectedCat.name : 'Session'), categoryId, durationMinutes, intensity, notes });
+        }
+        this.closeModal();
+        this.loadDailyPlan();
+      } catch (error) {
+        console.error('Daily plan save error:', error);
+      }
+    });
+
+    // Auto-fill title from category if empty (new item only)
+    if (!isEdit) {
+      document.getElementById('daily-plan-category').addEventListener('change', (e) => {
+        const titleEl = document.getElementById('daily-plan-title');
+        const cat = categories.find(c => c.id === parseInt(e.target.value));
+        if (cat && !titleEl.value) titleEl.value = cat.name;
+      });
+      // Pre-fill on open
+      const firstCat = categories[0];
+      if (firstCat) document.getElementById('daily-plan-title').placeholder = firstCat.name;
+    }
+  }
+
+  async completeDailyPlanItem(id) {
+    try {
+      await api.completePlan(id);
+      this.loadDailyPlan();
+      this.loadDashboard();
+    } catch (error) {
+      console.error('Complete daily plan error:', error);
+    }
+  }
+
+  async skipDailyPlanItem(id) {
+    try {
+      await api.skipPlan(id);
+      this.loadDailyPlan();
+    } catch (error) {
+      console.error('Skip daily plan error:', error);
+    }
+  }
+
+  async deleteDailyPlanItem(id) {
+    try {
+      await api.deletePlan(id);
+      this.loadDailyPlan();
+    } catch (error) {
+      console.error('Delete daily plan error:', error);
     }
   }
 
@@ -1395,6 +1654,61 @@ class LogbookApp {
 
   closeModal() {
     document.getElementById('modal-overlay').style.display = 'none';
+  }
+
+  openEditWeeklyPlanModal(item, area) {
+    const categories = area === 'study' ? this.studyCategories.filter(c => c.isActive) : this.footballCategories.filter(c => c.isActive);
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    this.openModal(`Edit ${area === 'study' ? 'Study' : 'Football'} Plan Item`, `
+      <form id="edit-weekly-plan-form">
+        <div class="form-group">
+          <label>Day of Week</label>
+          <select id="edit-weekly-plan-day" class="form-select" required>
+            ${days.map((d, i) => `<option value="${i}" ${i === item.dayOfWeek ? 'selected' : ''}>${d}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="edit-weekly-plan-category" class="form-select" required>
+            ${categories.map(c => `<option value="${c.id}" ${c.id === item.categoryId ? 'selected' : ''}>${c.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Duration (minutes)</label>
+          <input type="number" id="edit-weekly-plan-duration" class="form-input" value="${item.durationMinutes}" min="5" max="480" required>
+        </div>
+        <div class="form-group">
+          <label>Start Time (optional)</label>
+          <input type="time" id="edit-weekly-plan-start-time" class="form-input" value="${item.startTime || ''}" min="07:00" max="18:00" step="900">
+        </div>
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <textarea id="edit-weekly-plan-notes" class="form-input" rows="2">${item.notes || ''}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Save Changes</button>
+      </form>
+    `);
+
+    document.getElementById('edit-weekly-plan-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const selectedCatId = parseInt(document.getElementById('edit-weekly-plan-category').value);
+        const selectedCat = categories.find(c => c.id === selectedCatId);
+        const dayOfWeek = parseInt(document.getElementById('edit-weekly-plan-day').value);
+        const durationMinutes = parseInt(document.getElementById('edit-weekly-plan-duration').value);
+        const startTime = document.getElementById('edit-weekly-plan-start-time').value || null;
+        const notes = document.getElementById('edit-weekly-plan-notes').value || null;
+        const title = selectedCat ? selectedCat.name : item.title;
+
+        await api.updateWeeklyPlan(item.id, { dayOfWeek, categoryId: selectedCatId, title, durationMinutes, startTime, notes });
+        this.closeModal();
+        if (area === 'study') this.loadStudyWeeklyPlan();
+        else this.loadFootballWeeklyPlan();
+      } catch (error) {
+        console.error('Edit weekly plan error:', error);
+      }
+    });
   }
 
   openWeeklyPlanModal(area, preselectedDay = null) {
