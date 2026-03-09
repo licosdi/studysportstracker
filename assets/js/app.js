@@ -100,9 +100,54 @@ class LogbookApp {
   showMainApp() {
     document.getElementById('auth-view').style.display = 'none';
     document.getElementById('main-app').style.display = 'flex';
-    document.getElementById('user-name').textContent = this.currentUser.name;
-    document.getElementById('settings-name').value = this.currentUser.name;
-    document.getElementById('settings-email').value = this.currentUser.email;
+
+    // Update all user name elements
+    const name = this.currentUser.name;
+    const initials = name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U';
+
+    // Sidebar
+    const sidebarName = document.getElementById('sidebar-user-name');
+    const sidebarAvatar = document.getElementById('sidebar-user-avatar');
+    if (sidebarName) sidebarName.textContent = name;
+    if (sidebarAvatar) sidebarAvatar.textContent = initials;
+
+    // Mobile
+    const mobileUserName = document.getElementById('mobile-user-name');
+    if (mobileUserName) mobileUserName.textContent = name.split(' ')[0];
+
+    // Mobile profile
+    const mobileProfileAvatar = document.getElementById('mobile-profile-avatar');
+    const mobileProfileName = document.getElementById('mobile-profile-name');
+    if (mobileProfileAvatar) mobileProfileAvatar.textContent = initials;
+    if (mobileProfileName) mobileProfileName.textContent = name;
+
+    // Desktop profile
+    const profileAvatar = document.getElementById('profile-avatar-initials');
+    const profileName = document.getElementById('profile-display-name');
+    if (profileAvatar) profileAvatar.textContent = initials;
+    if (profileName) profileName.textContent = name;
+
+    // Settings
+    const settingsName = document.getElementById('settings-name');
+    const settingsEmail = document.getElementById('settings-email');
+    if (settingsName) settingsName.value = name;
+    if (settingsEmail) settingsEmail.value = this.currentUser.email;
+
+    // Mobile settings
+    const mobileSettingsName = document.getElementById('mobile-settings-name');
+    const mobileSettingsEmail = document.getElementById('mobile-settings-email');
+    if (mobileSettingsName) mobileSettingsName.value = name;
+    if (mobileSettingsEmail) mobileSettingsEmail.value = this.currentUser.email;
+
+    // Mobile greeting
+    const greetingEl = document.getElementById('mobile-greeting-time');
+    if (greetingEl) {
+      const hour = new Date().getHours();
+      greetingEl.textContent = hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,';
+    }
+
+    // Setup platform-specific navigation
+    this.setupPlatformNav();
   }
 
   async handleLogin(e) {
@@ -148,6 +193,8 @@ class LogbookApp {
     await this.checkAndResetTimetable();
     await this.loadCategories();
     await this.loadDashboard();
+    await this.loadMobileDashboard();
+    this.loadMobileSessions('study');
   }
 
   async checkAndResetTimetable() {
@@ -243,11 +290,17 @@ class LogbookApp {
     document.getElementById('signup-form').addEventListener('submit', (e) => this.handleSignup(e));
     document.getElementById('logout-btn').addEventListener('click', () => this.handleLogout());
 
-    // Navigation
+    // Desktop navigation
     document.querySelectorAll('.nav-link').forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
-        this.navigateTo(link.dataset.view);
+        if (link.id === 'ai-panel-toggle-btn') {
+          this.toggleAIPanel();
+          return;
+        }
+        if (link.dataset.view) {
+          this.navigateTo(link.dataset.view);
+        }
       });
     });
 
@@ -282,6 +335,11 @@ class LogbookApp {
     // Settings actions
     document.getElementById('add-study-category-btn').addEventListener('click', () => this.openCategoryModal('study'));
     document.getElementById('add-football-category-btn').addEventListener('click', () => this.openCategoryModal('football'));
+    document.getElementById('add-study-template-btn')?.addEventListener('click', () => this.openTemplateModal('study'));
+    document.getElementById('add-football-template-btn')?.addEventListener('click', () => this.openTemplateModal('football'));
+
+    // Save profile (desktop settings)
+    document.getElementById('save-profile-btn')?.addEventListener('click', () => this.saveProfile());
 
     // Modal close
     document.getElementById('modal-close').addEventListener('click', () => this.closeModal());
@@ -291,6 +349,418 @@ class LogbookApp {
 
     // Timer event listeners
     this.setupTimerListeners();
+  }
+
+  setupPlatformNav() {
+    // ---- Sidebar collapse (desktop) ----
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('main-content');
+    if (sidebarToggle && sidebar) {
+      // Remove previous listener by cloning
+      const newToggle = sidebarToggle.cloneNode(true);
+      sidebarToggle.parentNode.replaceChild(newToggle, sidebarToggle);
+      newToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        if (mainContent) mainContent.classList.toggle('sidebar-collapsed');
+        newToggle.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+      });
+    }
+
+    // ---- Desktop AI panel ----
+    const aiPanelClose = document.getElementById('ai-panel-close');
+    if (aiPanelClose) {
+      const newClose = aiPanelClose.cloneNode(true);
+      aiPanelClose.parentNode.replaceChild(newClose, aiPanelClose);
+      newClose.addEventListener('click', () => this.closeAIPanel());
+    }
+
+    // ---- Mobile bottom nav ----
+    document.querySelectorAll('.bottom-nav-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mobileView = btn.dataset.mobileView;
+        if (mobileView) this.switchMobileView(mobileView);
+      });
+    });
+
+    // Today's Schedule "Plan →" button in mobile dashboard
+    const mobilePlanBtn = document.querySelector('.card-header [data-mobile-view="mobile-sessions"]');
+    if (mobilePlanBtn) {
+      mobilePlanBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.switchMobileView('mobile-sessions');
+      });
+    }
+
+    // ---- iOS AI FAB + Sheet ----
+    const aiFab = document.getElementById('ai-fab');
+    const aiSheet = document.getElementById('ai-sheet');
+    const sheetOverlay = document.getElementById('sheet-overlay');
+    const aiSheetClose = document.getElementById('ai-sheet-close');
+
+    if (aiFab && aiSheet) {
+      aiFab.addEventListener('click', () => this.openAISheet());
+    }
+    if (aiSheetClose) {
+      aiSheetClose.addEventListener('click', () => this.closeAISheet());
+    }
+    if (sheetOverlay) {
+      sheetOverlay.addEventListener('click', () => this.closeAISheet());
+    }
+
+    // ---- Extra logout handlers ----
+    document.getElementById('logout-btn-profile')?.addEventListener('click', () => this.handleLogout());
+    document.getElementById('logout-btn-mobile')?.addEventListener('click', () => this.handleLogout());
+
+    // ---- Mobile add session button ----
+    document.getElementById('mobile-add-session-btn')?.addEventListener('click', () => this.openQuickLog());
+
+    // ---- Mobile save profile ----
+    document.getElementById('mobile-save-profile-btn')?.addEventListener('click', () => this.saveMobileProfile());
+  }
+
+  switchMobileView(viewId) {
+    // Update bottom nav active state
+    document.querySelectorAll('.bottom-nav-item').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mobileView === viewId);
+    });
+
+    // Show/hide mobile views
+    document.querySelectorAll('.mobile-view').forEach(view => {
+      if (view.id === `${viewId}-view`) {
+        view.style.display = '';
+        view.classList.add('active');
+      } else {
+        view.style.display = 'none';
+        view.classList.remove('active');
+      }
+    });
+
+    // Load data for view
+    switch (viewId) {
+      case 'mobile-dashboard': this.loadMobileDashboard(); break;
+      case 'mobile-sessions': this.loadMobileSessions('study'); break;
+      case 'mobile-progress': this.loadMobileProgress(); break;
+    }
+  }
+
+  switchMobileSessionTab(area) {
+    const studyTab = document.getElementById('mobile-study-tab');
+    const footballTab = document.getElementById('mobile-football-tab');
+    const studySessions = document.getElementById('mobile-study-sessions');
+    const footballSessions = document.getElementById('mobile-football-sessions');
+
+    if (area === 'study') {
+      studyTab?.classList.add('active');
+      footballTab?.classList.remove('active');
+      if (studyTab) studyTab.style.background = 'var(--surface)';
+      if (footballTab) footballTab.style.background = 'transparent';
+      if (studySessions) studySessions.style.display = '';
+      if (footballSessions) footballSessions.style.display = 'none';
+    } else {
+      footballTab?.classList.add('active');
+      studyTab?.classList.remove('active');
+      if (footballTab) footballTab.style.background = 'var(--surface)';
+      if (studyTab) studyTab.style.background = 'transparent';
+      if (footballSessions) footballSessions.style.display = '';
+      if (studySessions) studySessions.style.display = 'none';
+      this.loadMobileSessions('football');
+    }
+  }
+
+  async loadMobileDashboard() {
+    try {
+      const data = await api.getDashboard();
+
+      // Progress ring — use today's total minutes as proxy for "points"
+      const todayMinutes = (data.today.study.minutes || 0) + (data.today.football.minutes || 0);
+      const goalMinutes = 90; // 90-min daily goal
+      const pct = Math.min(todayMinutes / goalMinutes, 1);
+      const circumference = 2 * Math.PI * 52; // r=52 from HTML
+      const ringFill = document.getElementById('mobile-ring-fill');
+      const ringValue = document.getElementById('mobile-ring-value');
+      const ringLabel = document.getElementById('mobile-ring-label');
+      if (ringFill) ringFill.style.strokeDashoffset = circumference * (1 - pct);
+      if (ringValue) ringValue.textContent = todayMinutes;
+      if (ringLabel) ringLabel.textContent = 'min today';
+
+      // Weekly progress bar
+      const weekTotal = (data.week.study.sessions || 0) + (data.week.football.sessions || 0);
+      const weekGoal = 10;
+      const weekPct = Math.min(weekTotal / weekGoal * 100, 100);
+      const weekBar = document.getElementById('mobile-weekly-bar');
+      const weekLabel = document.getElementById('mobile-weekly-label');
+      if (weekBar) weekBar.style.width = `${weekPct}%`;
+      if (weekLabel) weekLabel.textContent = `${weekTotal} / ${weekGoal} sessions (${Math.round(weekPct)}%)`;
+
+      // Today study/football
+      const todayStudyEl = document.getElementById('mobile-today-study');
+      const todayFootballEl = document.getElementById('mobile-today-football');
+      if (todayStudyEl) todayStudyEl.textContent = this.formatDuration(data.today.study.minutes);
+      if (todayFootballEl) todayFootballEl.textContent = this.formatDuration(data.today.football.minutes);
+
+      // Today's schedule
+      const pendingEl = document.getElementById('mobile-pending-plans');
+      if (pendingEl) {
+        if (data.today.schedule && data.today.schedule.length > 0) {
+          pendingEl.innerHTML = data.today.schedule.map(s => `
+            <div class="list-item ${s.isCompleted ? 'completed' : ''}">
+              <span class="category-badge" style="background: ${s.categoryColor}">${s.categoryName}</span>
+              <span class="list-item-title" style="${s.isCompleted ? 'text-decoration:line-through;opacity:0.6' : ''}">${s.title}</span>
+              <span class="list-item-meta">${s.durationMinutes}m</span>
+            </div>
+          `).join('');
+        } else {
+          pendingEl.innerHTML = '<p class="empty-state">No sessions scheduled for today</p>';
+        }
+      }
+
+      // Recent logs
+      const recentEl = document.getElementById('mobile-recent-logs');
+      if (recentEl) {
+        if (data.recentLogs && data.recentLogs.length > 0) {
+          recentEl.innerHTML = data.recentLogs.slice(0, 5).map(l => `
+            <div class="list-item">
+              <span class="category-badge" style="background: ${l.categoryColor}">${l.categoryName}</span>
+              <span class="list-item-title">${l.title}</span>
+              <span class="list-item-meta">${this.formatDuration(l.durationMinutes)}</span>
+            </div>
+          `).join('');
+        } else {
+          recentEl.innerHTML = '<p class="empty-state">No recent activity</p>';
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load mobile dashboard:', error);
+    }
+  }
+
+  async loadMobileSessions(area) {
+    const containerId = area === 'study' ? 'mobile-study-sessions' : 'mobile-football-sessions';
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    try {
+      const weekStart = this.formatDate(this.getWeekStart(new Date()));
+      const { items } = await api.getWeeklyPlanStatus(weekStart, area);
+      const categories = area === 'study' ? this.studyCategories : this.footballCategories;
+
+      if (items && items.length > 0) {
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        container.innerHTML = items.map(item => `
+          <div class="session-library-item">
+            <div class="session-lib-left">
+              <span class="category-badge" style="background: ${item.categoryColor}">${item.categoryName}</span>
+              <div style="margin-top:0.35rem;">
+                <span style="font-size:0.8rem;color:var(--text-2);">${days[item.dayOfWeek]} · ${item.durationMinutes}m</span>
+                ${item.startTime ? `<span style="font-size:0.75rem;color:var(--text-3);margin-left:0.4rem;">${item.startTime}</span>` : ''}
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              ${item.isCompleted ? '<span style="font-size:0.7rem;background:var(--success);color:#fff;padding:0.15rem 0.4rem;border-radius:999px;">done</span>' : ''}
+              <label class="plan-checkbox">
+                <input type="checkbox" ${item.isCompleted ? 'checked' : ''} data-weekly-id="${item.id}" data-area="${area}">
+              </label>
+            </div>
+          </div>
+        `).join('');
+
+        container.querySelectorAll('input[data-weekly-id]').forEach(cb => {
+          cb.addEventListener('change', () => {
+            if (cb.checked) this.completeWeeklyPlan(cb.dataset.weeklyId, cb.dataset.area);
+            else this.uncompleteWeeklyPlan(cb.dataset.weeklyId, cb.dataset.area);
+          });
+        });
+      } else {
+        container.innerHTML = '<p class="empty-state" style="padding:1.5rem 0;">No sessions in this week\'s plan</p>';
+      }
+    } catch (error) {
+      console.error(`Failed to load mobile ${area} sessions:`, error);
+      container.innerHTML = '<p class="empty-state" style="padding:1.5rem 0;">Failed to load sessions</p>';
+    }
+  }
+
+  async loadMobileProgress() {
+    try {
+      const weekStart = this.getWeekStart(new Date());
+      const data = await api.getWeeklyStats(this.formatDate(weekStart), 'study');
+
+      // Weekly chart
+      const chartEl = document.getElementById('mobile-weekly-chart');
+      const labelsEl = document.getElementById('mobile-chart-labels');
+      const dailyData = data.daily ? data.daily.filter(d => d.area === 'study') : [];
+
+      if (chartEl && dailyData.length > 0) {
+        const maxMin = Math.max(...dailyData.map(d => d.totalMinutes), 30);
+        chartEl.innerHTML = dailyData.map(d => {
+          const pct = Math.round(d.totalMinutes / maxMin * 100);
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0.25rem;">
+            <div style="width:100%;background:var(--primary);border-radius:4px 4px 0 0;height:${pct}%;min-height:${d.totalMinutes > 0 ? 4 : 0}px;"></div>
+          </div>`;
+        }).join('');
+        if (labelsEl) {
+          labelsEl.innerHTML = dailyData.map(d =>
+            `<span>${new Date(d.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })}</span>`
+          ).join('');
+        }
+      } else if (chartEl) {
+        chartEl.innerHTML = '<div style="width:100%;text-align:center;color:var(--text-3);font-size:0.875rem;">No data this week</div>';
+      }
+
+      // Weekly goal
+      const [studyPlan, footballPlan] = await Promise.all([
+        api.getWeeklyPlanStatus(this.formatDate(weekStart), 'study'),
+        api.getWeeklyPlanStatus(this.formatDate(weekStart), 'football')
+      ]);
+      const allItems = [...(studyPlan.items || []), ...(footballPlan.items || [])];
+      const total = allItems.length;
+      const completed = allItems.filter(i => i.isCompleted).length;
+      const pct = total > 0 ? Math.round(completed / total * 100) : 0;
+
+      const goalBar = document.getElementById('mobile-goal-bar');
+      const goalLabel = document.getElementById('mobile-goal-label');
+      if (goalBar) goalBar.style.width = `${pct}%`;
+      if (goalLabel) goalLabel.textContent = `${completed} / ${total} sessions (${pct}%)`;
+
+    } catch (error) {
+      console.error('Failed to load mobile progress:', error);
+    }
+  }
+
+  // ---- AI Panel (Desktop) ----
+  toggleAIPanel() {
+    const panel = document.getElementById('ai-panel');
+    const mainContent = document.getElementById('main-content');
+    if (!panel) return;
+    const isOpen = panel.classList.contains('open');
+    if (isOpen) {
+      this.closeAIPanel();
+    } else {
+      panel.classList.add('open');
+      if (mainContent) mainContent.classList.add('ai-open');
+    }
+  }
+
+  closeAIPanel() {
+    const panel = document.getElementById('ai-panel');
+    const mainContent = document.getElementById('main-content');
+    if (panel) panel.classList.remove('open');
+    if (mainContent) mainContent.classList.remove('ai-open');
+  }
+
+  // ---- AI Sheet (iOS) ----
+  openAISheet() {
+    const sheet = document.getElementById('ai-sheet');
+    const overlay = document.getElementById('sheet-overlay');
+    if (sheet) sheet.classList.add('open');
+    if (overlay) overlay.classList.add('active');
+  }
+
+  closeAISheet() {
+    const sheet = document.getElementById('ai-sheet');
+    const overlay = document.getElementById('sheet-overlay');
+    if (sheet) sheet.classList.remove('open');
+    if (overlay) overlay.classList.remove('active');
+  }
+
+  // ---- Quick Log (shared modal for both platforms) ----
+  openQuickLog() {
+    const studyCats = this.studyCategories.filter(c => c.isActive);
+    const footballCats = this.footballCategories.filter(c => c.isActive);
+    const allCats = [
+      ...studyCats.map(c => ({ ...c, area: 'study' })),
+      ...footballCats.map(c => ({ ...c, area: 'football' }))
+    ];
+    const now = new Date();
+    const dateTimeStr = now.toISOString().slice(0, 16);
+
+    this.openModal('Log Session', `
+      <form id="quick-log-form">
+        <div class="form-group">
+          <label>Date & Time</label>
+          <input type="datetime-local" id="qlog-datetime" class="form-input" value="${dateTimeStr}" required>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="qlog-category" class="form-select" required>
+            <optgroup label="Study">
+              ${studyCats.map(c => `<option value="${c.id}" data-area="study">${c.name}</option>`).join('')}
+            </optgroup>
+            <optgroup label="Football">
+              ${footballCats.map(c => `<option value="${c.id}" data-area="football">${c.name}</option>`).join('')}
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" id="qlog-title" class="form-input" placeholder="What did you do?" required>
+        </div>
+        <div class="form-group">
+          <label>Duration (minutes)</label>
+          <input type="number" id="qlog-duration" class="form-input" value="45" min="1" max="480" required>
+        </div>
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <textarea id="qlog-notes" class="form-input" rows="2"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Log Session</button>
+      </form>
+    `);
+
+    document.getElementById('quick-log-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const categorySelect = document.getElementById('qlog-category');
+        const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+        const area = selectedOption.dataset.area;
+        await api.createLog({
+          area,
+          dateTime: new Date(document.getElementById('qlog-datetime').value).toISOString(),
+          categoryId: parseInt(categorySelect.value),
+          title: document.getElementById('qlog-title').value,
+          durationMinutes: parseInt(document.getElementById('qlog-duration').value),
+          notes: document.getElementById('qlog-notes').value || null
+        });
+        this.closeModal();
+        this.loadDashboard();
+        this.loadMobileDashboard();
+      } catch (error) {
+        console.error('Quick log error:', error);
+      }
+    });
+  }
+
+  // ---- Save Profile ----
+  saveProfile() {
+    const nameInput = document.getElementById('settings-name');
+    if (!nameInput || !nameInput.value.trim()) return;
+    const name = nameInput.value.trim();
+    this.currentUser.name = name;
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const updates = {
+      'sidebar-user-name': name,
+      'sidebar-user-avatar': initials,
+      'mobile-user-name': name.split(' ')[0],
+      'mobile-profile-name': name,
+      'mobile-profile-avatar': initials,
+      'profile-avatar-initials': initials,
+      'profile-display-name': name,
+      'mobile-settings-name': name
+    };
+    Object.entries(updates).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.tagName === 'INPUT') el.value = val;
+      else el.textContent = val;
+    });
+  }
+
+  saveMobileProfile() {
+    const nameInput = document.getElementById('mobile-settings-name');
+    if (!nameInput) return;
+    const desktopInput = document.getElementById('settings-name');
+    if (desktopInput) desktopInput.value = nameInput.value;
+    this.saveProfile();
   }
 
   setupTimerListeners() {
@@ -307,9 +777,10 @@ class LogbookApp {
   navigateTo(view) {
     this.currentView = view;
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-    document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
+    document.querySelectorAll(`[data-view="${view}"]`).forEach(el => el.classList.add('active'));
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.getElementById(`${view}-view`).classList.add('active');
+    const viewEl = document.getElementById(`${view}-view`);
+    if (viewEl) viewEl.classList.add('active');
 
     // Load view data
     switch (view) {
@@ -320,6 +791,29 @@ class LogbookApp {
       case 'football-weekly-plan': this.loadFootballWeeklyPlan(); break;
       case 'football-stats': this.loadFootballStats(); break;
       case 'settings': this.loadSettings(); break;
+      case 'profile': this.loadProfile(); break;
+    }
+  }
+
+  async loadProfile() {
+    try {
+      const data = await api.getDashboard();
+      const weekMinutes = (data.week.study.minutes || 0) + (data.week.football.minutes || 0);
+      const weekSessions = (data.week.study.sessions || 0) + (data.week.football.sessions || 0);
+
+      const totalPoints = document.getElementById('profile-total-points');
+      const longestStreak = document.getElementById('profile-longest-streak');
+      const totalSessions = document.getElementById('profile-total-sessions');
+      const mobileHours = document.getElementById('mobile-total-hours');
+      const mobileStreak = document.getElementById('mobile-streak');
+
+      if (totalPoints) totalPoints.textContent = `${Math.round(weekMinutes / 60)}h`;
+      if (longestStreak) longestStreak.textContent = data.streak || 0;
+      if (totalSessions) totalSessions.textContent = weekSessions;
+      if (mobileHours) mobileHours.textContent = `${Math.round(weekMinutes / 60)}h`;
+      if (mobileStreak) mobileStreak.textContent = data.streak || 0;
+    } catch (error) {
+      console.error('Failed to load profile:', error);
     }
   }
 
@@ -401,6 +895,11 @@ class LogbookApp {
     timer.categoryId = parseInt(categorySelect.value);
     timer.isRunning = true;
     timer.isPaused = false;
+
+    // Request notification permission the first time the timer is started
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
 
     const categories = area === 'study' ? this.studyCategories : this.footballCategories;
     const category = categories.find(c => c.id === timer.categoryId);
@@ -501,6 +1000,19 @@ class LogbookApp {
 
       const label = document.getElementById(`${area}-timer-label`);
       if (label) label.textContent = 'Session complete!';
+
+      // Fire macOS notification via service worker (or directly if SW unavailable)
+      const notifTitle = 'Logbook';
+      const notifBody = `${category?.name || area} session complete! Time for a break.`;
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'TIMER_COMPLETE',
+          title: notifTitle,
+          body: notifBody,
+        });
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(notifTitle, { body: notifBody, icon: '/assets/icons/icon-192.png' });
+      }
 
     } catch (error) {
       console.error('Failed to log session:', error);
@@ -639,66 +1151,79 @@ class LogbookApp {
 
   setupDragAndDrop(container, area) {
     let draggedEl = null;
+    let dragSourceDay = null;
 
-    container.querySelectorAll('.day-items').forEach(dayList => {
-      dayList.addEventListener('dragstart', (e) => {
-        const item = e.target.closest('.plan-item');
-        if (!item) return;
-        draggedEl = item;
-        item.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', item.dataset.id);
-      });
+    // Event delegation on the grid container — enables cross-day drag
+    container.addEventListener('dragstart', (e) => {
+      const item = e.target.closest('.plan-item');
+      if (!item) return;
+      draggedEl = item;
+      dragSourceDay = parseInt(item.closest('.day-items').dataset.day);
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', item.dataset.id);
+    });
 
-      dayList.addEventListener('dragend', (e) => {
-        const item = e.target.closest('.plan-item');
-        if (item) item.classList.remove('dragging');
-        container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
-        draggedEl = null;
-      });
+    container.addEventListener('dragend', () => {
+      if (draggedEl) draggedEl.classList.remove('dragging');
+      container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+      container.querySelectorAll('.day-items.drag-target').forEach(el => el.classList.remove('drag-target'));
+      draggedEl = null;
+      dragSourceDay = null;
+    });
 
-      dayList.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const target = e.target.closest('.plan-item');
-        if (!target || target === draggedEl) return;
-        // Only allow reorder within same day
-        if (target.closest('.day-items') !== draggedEl?.closest('.day-items')) return;
-        container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
-        target.classList.add('drag-over');
-      });
+    container.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!draggedEl) return;
+      container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+      container.querySelectorAll('.day-items.drag-target').forEach(el => el.classList.remove('drag-target'));
+      const targetItem = e.target.closest('.plan-item');
+      const targetDayList = e.target.closest('.day-items');
+      if (targetItem && targetItem !== draggedEl) {
+        targetItem.classList.add('drag-over');
+      } else if (targetDayList) {
+        targetDayList.classList.add('drag-target');
+      }
+    });
 
-      dayList.addEventListener('dragleave', (e) => {
-        const target = e.target.closest('.plan-item');
-        if (target) target.classList.remove('drag-over');
-      });
+    container.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (!draggedEl) return;
+      container.querySelectorAll('.plan-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+      container.querySelectorAll('.day-items.drag-target').forEach(el => el.classList.remove('drag-target'));
 
-      dayList.addEventListener('drop', (e) => {
-        e.preventDefault();
-        if (!draggedEl) return;
-        const target = e.target.closest('.plan-item');
-        if (!target || target === draggedEl) return;
-        if (target.closest('.day-items') !== draggedEl.closest('.day-items')) return;
+      const targetItem = e.target.closest('.plan-item');
+      const targetDayList = e.target.closest('.day-items');
+      if (!targetDayList) return;
 
-        const list = draggedEl.closest('.day-items');
-        const allItems = [...list.querySelectorAll('.plan-item')];
-        const dragIdx = allItems.indexOf(draggedEl);
-        const targetIdx = allItems.indexOf(target);
+      const targetDay = parseInt(targetDayList.dataset.day);
 
-        if (dragIdx < targetIdx) {
-          list.insertBefore(draggedEl, target.nextSibling);
-        } else {
-          list.insertBefore(draggedEl, target);
+      if (targetItem && targetItem !== draggedEl) {
+        // Insert before or after based on cursor Y midpoint
+        const rect = targetItem.getBoundingClientRect();
+        const before = e.clientY < (rect.top + rect.height / 2);
+        targetDayList.insertBefore(draggedEl, before ? targetItem : targetItem.nextSibling);
+      } else {
+        // Dropped onto empty space — append to end of day
+        targetDayList.appendChild(draggedEl);
+      }
+
+      // Build reorder payload for both affected days
+      const reorderPayload = [...targetDayList.querySelectorAll('.plan-item')]
+        .map((el, idx) => ({ id: parseInt(el.dataset.id), sortOrder: idx, dayOfWeek: targetDay }));
+
+      if (dragSourceDay !== targetDay) {
+        const sourceDayList = container.querySelector(`.day-items[data-day="${dragSourceDay}"]`);
+        if (sourceDayList) {
+          [...sourceDayList.querySelectorAll('.plan-item')]
+            .forEach((el, idx) => reorderPayload.push({ id: parseInt(el.dataset.id), sortOrder: idx, dayOfWeek: dragSourceDay }));
         }
+      }
 
-        target.classList.remove('drag-over');
-
-        // Persist new order
-        const reordered = [...list.querySelectorAll('.plan-item')].map((el, idx) => ({
-          id: parseInt(el.dataset.id),
-          sortOrder: idx
-        }));
-        api.reorderWeeklyPlans(reordered).catch(err => console.error('Reorder failed', err));
+      api.reorderWeeklyPlans(reorderPayload).catch(() => {
+        if (area === 'study') this.loadStudyWeeklyPlan();
+        else this.loadFootballWeeklyPlan();
       });
     });
   }
@@ -1158,6 +1683,8 @@ class LogbookApp {
   loadSettings() {
     this.renderStudyCategories();
     this.renderFootballCategories();
+    this.loadAndRenderTemplates('study');
+    this.loadAndRenderTemplates('football');
   }
 
   renderStudyCategories() {
@@ -1244,6 +1771,109 @@ class LogbookApp {
       this.renderFootballCategories();
     } catch (error) {
       console.error('Delete football category error:', error);
+    }
+  }
+
+  // ==================== WEEKLY PLAN TEMPLATES ====================
+
+  async loadAndRenderTemplates(area) {
+    try {
+      const { templates } = await api.getWeeklyPlanTemplates(area);
+      this.renderTemplateList(area, templates);
+    } catch (error) {
+      console.error(`Failed to load ${area} templates:`, error);
+    }
+  }
+
+  renderTemplateList(area, templates) {
+    const container = document.getElementById(`${area}-templates-list`);
+    if (!container) return;
+    const today = new Date().toISOString().split('T')[0];
+
+    if (templates.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-muted,#94a3b8);font-size:0.875rem;padding:0.5rem 0">No templates yet. All sessions use the default schedule.</p>';
+      return;
+    }
+
+    container.innerHTML = templates.map(t => {
+      const isActive = t.startDate <= today && (!t.endDate || t.endDate >= today);
+      return `
+        <div class="category-item" style="justify-content:space-between">
+          <div style="display:flex;flex-direction:column;gap:0.2rem">
+            <span style="font-weight:500">${t.name}${isActive ? ' <span style="background:var(--primary,#6366f1);color:#fff;font-size:0.7rem;padding:0.1rem 0.4rem;border-radius:9999px;font-weight:600">Active</span>' : ''}</span>
+            <span style="font-size:0.8rem;color:var(--text-muted,#94a3b8)">${t.startDate} — ${t.endDate || 'ongoing'}</span>
+          </div>
+          <div class="category-actions">
+            <button class="btn btn-ghost btn-sm" data-edit-template="${t.id}" data-area="${area}">Edit</button>
+            <button class="btn btn-ghost btn-sm" data-delete-template="${t.id}" data-area="${area}">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('[data-edit-template]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const template = templates.find(t => t.id === parseInt(btn.dataset.editTemplate));
+        this.openTemplateModal(btn.dataset.area, template);
+      });
+    });
+    container.querySelectorAll('[data-delete-template]').forEach(btn => {
+      btn.addEventListener('click', () => this.deleteTemplate(btn.dataset.area, btn.dataset.deleteTemplate));
+    });
+  }
+
+  openTemplateModal(area, existing = null) {
+    const isEdit = !!existing;
+    const title = isEdit ? 'Edit Template' : `New ${area === 'study' ? 'Study' : 'Football'} Template`;
+    this.openModal(title, `
+      <form id="template-form">
+        <div class="form-group">
+          <label>Template Name</label>
+          <input type="text" id="template-name" class="form-input" placeholder="e.g. Pre-season block" value="${existing ? existing.name : ''}" required>
+        </div>
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" id="template-start-date" class="form-input" value="${existing ? existing.startDate : ''}" required>
+        </div>
+        <div class="form-group">
+          <label>End Date <span style="color:var(--text-muted,#94a3b8);font-size:0.8rem">(optional — leave blank for open-ended)</span></label>
+          <input type="date" id="template-end-date" class="form-input" value="${existing && existing.endDate ? existing.endDate : ''}">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%">${isEdit ? 'Save Changes' : 'Create Template'}</button>
+      </form>
+    `);
+
+    document.getElementById('template-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('template-name').value.trim();
+      const startDate = document.getElementById('template-start-date').value;
+      const endDate = document.getElementById('template-end-date').value || null;
+      if (!name || !startDate) return;
+      try {
+        if (isEdit) {
+          await api.updateWeeklyPlanTemplate(existing.id, { name, startDate, endDate });
+        } else {
+          await api.createWeeklyPlanTemplate({ name, area, startDate, endDate });
+        }
+        this.closeModal();
+        this.loadAndRenderTemplates(area);
+      } catch (error) {
+        alert(error.message || 'Failed to save template');
+      }
+    });
+  }
+
+  async deleteTemplate(area, id) {
+    if (!confirm('Delete this template?')) return;
+    try {
+      await api.deleteWeeklyPlanTemplate(id);
+      this.loadAndRenderTemplates(area);
+    } catch (error) {
+      if (error.message && error.message.includes('active sessions')) {
+        alert('This template has active sessions. Remove them from the planner first.');
+      } else {
+        alert(error.message || 'Failed to delete template');
+      }
     }
   }
 
